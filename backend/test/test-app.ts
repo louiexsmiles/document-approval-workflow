@@ -3,9 +3,12 @@ import { Test } from '@nestjs/testing';
 import { MikroORM } from '@mikro-orm/core';
 import { MikroOrmModule } from '@mikro-orm/nestjs';
 import { EntityManager, defineConfig } from '@mikro-orm/postgresql';
+import { ApprovalEvent } from '../src/documents/approval-event.entity';
+import { ApprovalStage } from '../src/documents/approval-stage.entity';
 import { Document } from '../src/documents/document.entity';
 import { DocumentStage } from '../src/documents/document-stage.enum';
 import { DocumentStatus } from '../src/documents/document-status.enum';
+import { StageApprover } from '../src/documents/stage-approver.entity';
 import { User } from '../src/users/user.entity';
 import { DocumentsModule } from '../src/documents/documents.module';
 import { UsersModule } from '../src/users/users.module';
@@ -50,7 +53,7 @@ export async function createTestApp(): Promise<TestContext> {
     imports: [
       MikroOrmModule.forRoot(
         defineConfig({
-          entities: [User, Document],
+          entities: [User, Document, ApprovalStage, StageApprover, ApprovalEvent],
           clientUrl: TEST_DATABASE_URL,
           allowGlobalContext: true,
           debug: false,
