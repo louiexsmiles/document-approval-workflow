@@ -1,6 +1,8 @@
+import { join } from 'path';
 import { INestApplication, ValidationPipe } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import { MikroORM } from '@mikro-orm/core';
+import { Migrator } from '@mikro-orm/migrations';
 import { MikroOrmModule } from '@mikro-orm/nestjs';
 import { EntityManager, defineConfig } from '@mikro-orm/postgresql';
 import { ApprovalEvent } from '../src/documents/approval-event.entity';
@@ -57,6 +59,10 @@ export async function createTestApp(): Promise<TestContext> {
           clientUrl: TEST_DATABASE_URL,
           allowGlobalContext: true,
           debug: false,
+          // Registered so the migration tests can run the real migrations. Ordinary
+          // tests still build their schema straight from the entities.
+          migrations: { path: join(__dirname, '..', 'src', 'migrations') },
+          extensions: [Migrator],
         }),
       ),
       UsersModule,
