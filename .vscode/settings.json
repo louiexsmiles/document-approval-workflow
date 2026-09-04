@@ -10,5 +10,25 @@
     "**/node_modules/**": true,
     "**/dist/**": true,
     "**/.next/**": true
-  }
+  },
+  "sqltools.connections": [
+    {
+      "name": "document_approval (dev)",
+      "driver": "PostgreSQL",
+      "server": "localhost",
+      "port": 5432,
+      "database": "document_approval",
+      "username": "postgres",
+      "password": "postgres"
+    },
+    {
+      "name": "document_approval_test",
+      "driver": "PostgreSQL",
+      "server": "localhost",
+      "port": 5432,
+      "database": "document_approval_test",
+      "username": "postgres",
+      "password": "postgres"
+    }
+  ]
 }
