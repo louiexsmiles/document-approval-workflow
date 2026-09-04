@@ -3,10 +3,10 @@ import { Migration } from '@mikro-orm/migrations';
 /**
  * Moves each document's three approver columns into rows in approval_stages and
  * stage_approvers. The columns themselves stay put until the service reads from the
- * new tables — see DECISIONS.md ADR-007.
+ * new tables.
  *
  * Raw SQL on purpose: a migration must keep running unchanged years from now, so it
- * cannot depend on entity classes that will be renamed.
+ * cannot depend on entity classes that may be renamed later.
  */
 export class Migration20260904203927_BackfillApproverColumnsIntoStages extends Migration {
   override async up(): Promise<void> {

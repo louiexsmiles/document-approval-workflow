@@ -11,3 +11,6 @@ coverage
 !backend/.env
 !backend/.env.example
 
+
+# MikroORM writes a schema snapshot per database; only the dev one is shared.
+backend/src/migrations/.snapshot-*_test.json

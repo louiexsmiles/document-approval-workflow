@@ -19,7 +19,7 @@ import { StageApprover } from './stage-approver.entity';
  * One step in a document's approval workflow.
  *
  * Owned by the document, not shared between documents — editing one document's workflow
- * can never affect another's. See DECISIONS.md ADR-002.
+ * can never affect another's.
  */
 @Entity({ tableName: 'approval_stages' })
 @Unique({ properties: ['document', 'position'] })

@@ -1,4 +1,4 @@
-/** Where a document goes when this stage rejects it. See DECISIONS.md ADR-004. */
+/** Where a document goes when this stage rejects it. */
 export enum StageRejectBehavior {
   /** Back to the beginning. Matches the original hardcoded behaviour. */
   TO_FIRST_STAGE = 'TO_FIRST_STAGE',

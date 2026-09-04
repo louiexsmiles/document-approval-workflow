@@ -17,7 +17,6 @@ import { Document } from './document.entity';
  * One recorded action on a document. Append-only: rows are never updated or deleted.
  *
  * No `updatedAt` on purpose — an audit record that can be edited is not an audit record.
- * See DECISIONS.md ADR-006.
  */
 @Entity({ tableName: 'approval_events' })
 @Index({ properties: ['document', 'createdAt'] })
@@ -40,7 +39,7 @@ export class ApprovalEvent {
   @Enum(() => ApprovalAction)
   action!: ApprovalAction;
 
-  /** Required when rejecting — a rejection with no reason is useless. ADR-004. */
+  /** Required when rejecting — a rejection with no reason is useless. */
   @Property({ type: 'text', nullable: true })
   comment: string | null = null;
 
