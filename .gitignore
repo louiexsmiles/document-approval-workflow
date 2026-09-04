@@ -1,0 +1,13 @@
+node_modules
+dist
+.next
+.env.local
+*.log
+.DS_Store
+coverage
+
+# Keep committed backend/.env for local defaults; ignore other env files.
+.env
+!backend/.env
+!backend/.env.example
+

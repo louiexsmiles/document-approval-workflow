@@ -1,0 +1,5 @@
+export enum DocumentStage {
+  DRAFT_REVIEW = 'DRAFT_REVIEW',
+  LEGAL_REVIEW = 'LEGAL_REVIEW',
+  FINAL_APPROVAL = 'FINAL_APPROVAL',
+}
