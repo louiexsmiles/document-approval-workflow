@@ -1,14 +1,24 @@
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { MikroORM } from '@mikro-orm/core';
 import { EntityManager } from '@mikro-orm/postgresql';
+import { ApprovalStage } from '../documents/approval-stage.entity';
 import { Document } from '../documents/document.entity';
-import { DocumentStage } from '../documents/document-stage.enum';
 import { DocumentStatus } from '../documents/document-status.enum';
+import { StageApprover } from '../documents/stage-approver.entity';
+import { StageApprovalPolicy } from '../documents/stage-approval-policy.enum';
+import { StageRejectBehavior } from '../documents/stage-reject-behavior.enum';
 import { User } from '../users/user.entity';
 
 function avatarUrlFor(name: string): string {
   return `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(name)}`;
 }
+
+type StageSeed = {
+  name: string;
+  approvers: User[];
+  policy?: StageApprovalPolicy;
+  rejectBehavior?: StageRejectBehavior;
+};
 
 @Injectable()
 export class SeedService implements OnModuleInit {
@@ -25,119 +35,105 @@ export class SeedService implements OnModuleInit {
   }
 
   private async seed() {
-    const userCount = await this.em.count(User);
-    if (userCount > 0) {
-      await this.backfillProfileFields();
+    if ((await this.em.count(User)) > 0) {
       this.logger.log('Seed data already present, skipping create');
       return;
     }
 
     this.logger.log('Seeding demo data...');
 
-    const alice = this.em.create(User, {
-      name: 'Alice Chen',
-      email: 'alice@example.com',
-      jobTitle: 'Product Manager',
-      avatarUrl: avatarUrlFor('Alice Chen'),
-    });
-    const bob = this.em.create(User, {
-      name: 'Bob Martinez',
-      email: 'bob@example.com',
-      jobTitle: 'Legal Counsel',
-      avatarUrl: avatarUrlFor('Bob Martinez'),
-    });
-    const cara = this.em.create(User, {
-      name: 'Cara Nguyen',
-      email: 'cara@example.com',
-      jobTitle: 'Compliance Lead',
-      avatarUrl: avatarUrlFor('Cara Nguyen'),
-    });
-    const dan = this.em.create(User, {
-      name: 'Dan Patel',
-      email: 'dan@example.com',
-      jobTitle: 'Engineering Manager',
-      avatarUrl: avatarUrlFor('Dan Patel'),
-    });
-    const eve = this.em.create(User, {
-      name: 'Eve Brooks',
-      email: 'eve@example.com',
-      jobTitle: 'General Counsel',
-      avatarUrl: avatarUrlFor('Eve Brooks'),
-    });
+    const [alice, bob, cara, dan, eve] = [
+      ['Alice Chen', 'alice@example.com', 'Product Manager'],
+      ['Bob Martinez', 'bob@example.com', 'Legal Counsel'],
+      ['Cara Nguyen', 'cara@example.com', 'Compliance Lead'],
+      ['Dan Patel', 'dan@example.com', 'Engineering Manager'],
+      ['Eve Brooks', 'eve@example.com', 'General Counsel'],
+    ].map(([name, email, jobTitle]) =>
+      this.em.create(User, { name, email, jobTitle, avatarUrl: avatarUrlFor(name) }),
+    );
 
-    this.em.create(Document, {
-      title: 'Vendor Onboarding Policy',
-      body: 'Draft policy covering how new vendors are evaluated and onboarded.',
-      currentStage: DocumentStage.DRAFT_REVIEW,
-      status: DocumentStatus.IN_PROGRESS,
-      draftReviewApprover: alice,
-      legalReviewApprover: bob,
-      finalApprovalApprover: cara,
-    });
+    // Deliberately different shapes, so the dynamic model is visible on first boot rather
+    // than needing someone to build a workflow before anything looks different.
 
-    this.em.create(Document, {
-      title: 'Data Retention Guidelines',
-      body: 'Guidelines for how long customer data is retained across products.',
-      currentStage: DocumentStage.LEGAL_REVIEW,
-      status: DocumentStatus.IN_PROGRESS,
-      draftReviewApprover: dan,
-      legalReviewApprover: eve,
-      finalApprovalApprover: alice,
-    });
+    // Three stages, one approver each — what every document used to look like.
+    this.buildDocument(
+      'Vendor Onboarding Policy',
+      'Draft policy covering how new vendors are evaluated and onboarded.',
+      [
+        { name: 'Draft Review', approvers: [alice] },
+        { name: 'Legal Review', approvers: [bob] },
+        { name: 'Final Approval', approvers: [cara] },
+      ],
+    );
 
-    this.em.create(Document, {
-      title: 'Incident Response Playbook',
-      body: 'Fully approved playbook for responding to security incidents.',
-      currentStage: DocumentStage.FINAL_APPROVAL,
-      status: DocumentStatus.APPROVED,
-      draftReviewApprover: bob,
-      legalReviewApprover: cara,
-      finalApprovalApprover: dan,
-    });
+    // Two stages, and the second needs everyone rather than anyone.
+    this.buildDocument(
+      'Data Retention Guidelines',
+      'Guidelines for how long customer data is retained across products.',
+      [
+        { name: 'Author Review', approvers: [dan] },
+        {
+          name: 'Legal and Compliance',
+          approvers: [bob, eve, cara],
+          policy: StageApprovalPolicy.ALL,
+          rejectBehavior: StageRejectBehavior.TO_PREVIOUS_STAGE,
+        },
+      ],
+    );
+
+    // Five stages, including one that can refuse the document outright.
+    this.buildDocument(
+      'Q4 Vendor Contract — Southwest Builders',
+      'Annual renewal of the construction services agreement.',
+      [
+        { name: 'Requester Check', approvers: [alice] },
+        { name: 'Budget Review', approvers: [dan] },
+        { name: 'Legal Review', approvers: [bob, eve], policy: StageApprovalPolicy.ALL },
+        { name: 'Compliance', approvers: [cara] },
+        {
+          name: 'Executive Sign-off',
+          approvers: [eve],
+          rejectBehavior: StageRejectBehavior.TERMINAL,
+        },
+      ],
+    );
+
+    // Already finished: no current stage, which is what a completed document looks like.
+    const done = this.buildDocument(
+      'Incident Response Playbook',
+      'Fully approved playbook for responding to security incidents.',
+      [
+        { name: 'Draft Review', approvers: [bob] },
+        { name: 'Legal Review', approvers: [cara] },
+        { name: 'Final Approval', approvers: [dan] },
+      ],
+    );
+    done.status = DocumentStatus.APPROVED;
+    done.currentStage = null;
 
     await this.em.flush();
-    this.logger.log('Seed data created (5 users, 3 documents)');
+    this.logger.log('Seed data created (5 users, 4 documents)');
   }
 
-  /** Fill profile fields if an older seed volume predates these columns. */
-  private async backfillProfileFields() {
-    const profiles: Record<string, { jobTitle: string; name: string }> = {
-      'alice@example.com': {
-        name: 'Alice Chen',
-        jobTitle: 'Product Manager',
-      },
-      'bob@example.com': {
-        name: 'Bob Martinez',
-        jobTitle: 'Legal Counsel',
-      },
-      'cara@example.com': {
-        name: 'Cara Nguyen',
-        jobTitle: 'Compliance Lead',
-      },
-      'dan@example.com': {
-        name: 'Dan Patel',
-        jobTitle: 'Engineering Manager',
-      },
-      'eve@example.com': {
-        name: 'Eve Brooks',
-        jobTitle: 'General Counsel',
-      },
-    };
+  private buildDocument(title: string, body: string, stages: StageSeed[]): Document {
+    const document = this.em.create(Document, { title, body });
 
-    const users = await this.em.find(User, {});
-    let updated = 0;
-    for (const user of users) {
-      const profile = profiles[user.email];
-      if (!profile) continue;
-      if (user.jobTitle == null || user.avatarUrl == null) {
-        user.jobTitle = user.jobTitle ?? profile.jobTitle;
-        user.avatarUrl = user.avatarUrl ?? avatarUrlFor(profile.name);
-        updated += 1;
+    const created = stages.map((seed, position) => {
+      const stage = this.em.create(ApprovalStage, {
+        document,
+        position,
+        name: seed.name,
+        policy: seed.policy ?? StageApprovalPolicy.ANY,
+        rejectBehavior: seed.rejectBehavior ?? StageRejectBehavior.TO_FIRST_STAGE,
+      });
+
+      for (const user of seed.approvers) {
+        this.em.create(StageApprover, { stage, user });
       }
-    }
-    if (updated > 0) {
-      await this.em.flush();
-      this.logger.log(`Backfilled profile fields for ${updated} users`);
-    }
+      return stage;
+    });
+
+    document.currentStage = created[0];
+    return document;
   }
 }

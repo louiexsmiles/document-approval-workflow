@@ -1,5 +1,9 @@
 {
-  "moduleFileExtensions": ["js", "json", "ts"],
+  "moduleFileExtensions": [
+    "js",
+    "json",
+    "ts"
+  ],
   "rootDir": ".",
   "testEnvironment": "node",
   "testRegex": ".e2e-spec.ts$",
@@ -7,5 +11,5 @@
     "^.+\\.(t|j)s$": "ts-jest"
   },
   "testTimeout": 30000,
-  "maxWorkers": 1
+  "_comment": "Suites share one database and each rebuilds the schema, so they must not overlap. The test:e2e script passes --runInBand; maxWorkers alone limits the worker pool but still allows one suite to start while another tears down."
 }

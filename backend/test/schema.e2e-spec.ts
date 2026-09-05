@@ -1,8 +1,6 @@
 import { EntityManager } from '@mikro-orm/postgresql';
 import { ApprovalStage } from '../src/documents/approval-stage.entity';
 import { Document } from '../src/documents/document.entity';
-import { DocumentStage } from '../src/documents/document-stage.enum';
-import { DocumentStatus } from '../src/documents/document-status.enum';
 import { StageApprover } from '../src/documents/stage-approver.entity';
 import { User } from '../src/users/user.entity';
 import { createTestApp, resetSchema, seedDocument, type TestContext } from './test-app';
@@ -81,32 +79,59 @@ describe('schema', () => {
       const { users } = await seedDocument(em);
 
       for (const title of ['Doc A', 'Doc B']) {
-        const doc = em.create(Document, {
-          title,
-          body: 'body',
-          currentStage: DocumentStage.DRAFT_REVIEW,
-          status: DocumentStatus.IN_PROGRESS,
-          draftReviewApprover: em.getReference(User, users[0].id),
-          legalReviewApprover: em.getReference(User, users[1].id),
-          finalApprovalApprover: em.getReference(User, users[2].id),
+        const doc = em.create(Document, { title, body: 'body' });
+        const stage = em.create(ApprovalStage, {
+          document: doc,
+          position: 0,
+          name: 'Review',
         });
-        em.create(ApprovalStage, { document: doc, position: 0, name: 'Review' });
+        em.create(StageApprover, { stage, user: em.getReference(User, users[0].id) });
+        // Required: a document in progress must be waiting somewhere.
+        doc.currentStage = stage;
       }
 
       await expect(em.flush()).resolves.not.toThrow();
     });
 
-    it('deletes a document stages and their approvers with the document', async () => {
-      const { document, users } = await seedDocument(em);
-      const stage = em.create(ApprovalStage, {
-        document: em.getReference(Document, document.id),
-        position: 0,
-        name: 'Review',
-      });
-      em.create(StageApprover, { stage, user: em.getReference(User, users[0].id) });
-      await em.flush();
-      em.clear();
+    it('refuses a document left in progress with no current stage', async () => {
+      const { document } = await seedDocument(em);
 
+      await expect(
+        em.nativeUpdate(Document, { id: document.id }, { currentStage: null }),
+      ).rejects.toThrow(/cannot both be true/);
+      em.clear();
+    });
+
+    it('refuses to delete the stage a document is waiting at', async () => {
+      // This is the case the trigger exists for: the foreign key would set
+      // current_stage_id to null and leave the document in progress but stranded.
+      const { document } = await seedDocument(em);
+      const stageId = document.currentStage!.id;
+
+      await expect(
+        em.nativeDelete(ApprovalStage, { id: stageId }),
+      ).rejects.toThrow(/cannot both be true/);
+      em.clear();
+    });
+
+    it('allows deleting a stage the document is not waiting at', async () => {
+      const { document } = await seedDocument(em);
+      const later = (await em.find(ApprovalStage, { document: document.id })).find(
+        (s) => s.position === 2,
+      )!;
+
+      await expect(em.nativeDelete(ApprovalStage, { id: later.id })).resolves.toBe(1);
+      em.clear();
+    });
+
+    it('deletes a document stages and their approvers with the document', async () => {
+      const { document } = await seedDocument(em);
+
+      expect(await em.count(ApprovalStage, { document: document.id })).toBe(3);
+      expect(await em.count(StageApprover, {})).toBe(3);
+
+      // currentStage points at a stage that is about to be deleted, so this also proves
+      // the pointer does not block the delete.
       await em.nativeDelete(Document, { id: document.id });
 
       expect(await em.count(ApprovalStage, { document: document.id })).toBe(0);

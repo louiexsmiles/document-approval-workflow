@@ -58,7 +58,10 @@ describe('approval workflow invariants', () => {
   }
 
   function rejectAs(userId: string, id = documentId) {
-    return request(server).post(`/documents/${id}/reject`).send({ userId });
+    // A reason is required on rejection, so every call supplies one.
+    return request(server)
+      .post(`/documents/${id}/reject`)
+      .send({ userId, comment: 'Needs changes before I can approve.' });
   }
 
   /** Approve repeatedly, always as whoever is currently authorised, until terminal. */

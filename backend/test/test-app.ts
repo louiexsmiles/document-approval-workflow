@@ -8,8 +8,7 @@ import { EntityManager, defineConfig } from '@mikro-orm/postgresql';
 import { ApprovalEvent } from '../src/documents/approval-event.entity';
 import { ApprovalStage } from '../src/documents/approval-stage.entity';
 import { Document } from '../src/documents/document.entity';
-import { DocumentStage } from '../src/documents/document-stage.enum';
-import { DocumentStatus } from '../src/documents/document-status.enum';
+import { StageApprovalPolicy } from '../src/documents/stage-approval-policy.enum';
 import { StageApprover } from '../src/documents/stage-approver.entity';
 import { User } from '../src/users/user.entity';
 import { DocumentsModule } from '../src/documents/documents.module';
@@ -32,15 +31,22 @@ export type UserResponse = {
   email: string;
 };
 
+export type StageResponse = {
+  id: string;
+  position: number;
+  name: string;
+  policy: string;
+  approvers: { user: UserResponse }[];
+};
+
 export type DocumentResponse = {
   id: string;
   title: string;
   body: string;
-  currentStage: string;
   status: string;
-  draftReviewApprover: UserResponse;
-  legalReviewApprover: UserResponse;
-  finalApprovalApprover: UserResponse;
+  approvalRound: number;
+  stages: StageResponse[];
+  currentStage: { id: string } | null;
 };
 
 export type TestContext = {
@@ -58,7 +64,7 @@ export async function createTestApp(): Promise<TestContext> {
           entities: [User, Document, ApprovalStage, StageApprover, ApprovalEvent],
           clientUrl: TEST_DATABASE_URL,
           allowGlobalContext: true,
-          debug: false,
+          debug: process.env.ORM_DEBUG === "1",
           // Registered so the migration tests can run the real migrations. Ordinary
           // tests still build their schema straight from the entities.
           migrations: { path: join(__dirname, '..', 'src', 'migrations') },
@@ -96,11 +102,20 @@ export async function createTestApp(): Promise<TestContext> {
   };
 }
 
-/** Rebuild the test schema. ensureDatabase first, so a fresh clone needs no createdb. */
+/**
+ * Rebuild the test schema by running the real migrations.
+ *
+ * Not refreshDatabase(), which builds from the entity classes. Anything a migration
+ * creates but an entity cannot describe — triggers, functions, views — would be missing,
+ * and the tests would pass against a schema production never uses.
+ *
+ * ensureDatabase first, so a fresh clone needs no createdb.
+ */
 export async function resetSchema(orm: MikroORM): Promise<void> {
   const generator = orm.getSchemaGenerator();
   await generator.ensureDatabase();
-  await generator.refreshDatabase();
+  await generator.dropSchema({ dropMigrationsTable: true });
+  await orm.getMigrator().up();
 }
 
 export type Fixture = {
@@ -123,15 +138,37 @@ export async function seedDocument(em: EntityManager): Promise<Fixture> {
   const document = em.create(Document, {
     title: 'Invariant Fixture',
     body: 'A document used to assert workflow invariants.',
-    currentStage: DocumentStage.DRAFT_REVIEW,
-    status: DocumentStatus.IN_PROGRESS,
-    draftReviewApprover: users[0],
-    legalReviewApprover: users[1],
-    finalApprovalApprover: users[2],
   });
+
+  const stages = ['Draft Review', 'Legal Review', 'Final Approval'].map((name, position) => {
+    const stage = em.create(ApprovalStage, {
+      document,
+      position,
+      name,
+      policy: StageApprovalPolicy.ANY,
+    });
+    em.create(StageApprover, { stage, user: users[position] });
+    return stage;
+  });
+
+  document.currentStage = stages[0];
 
   await em.flush();
   em.clear();
 
   return { users, document };
+}
+
+/** Just the people. Documents are then created through the API, so tests exercise
+ *  validation and the create path rather than reaching past them. */
+export async function seedUsers(em: EntityManager): Promise<User[]> {
+  const users = ['Alice', 'Bob', 'Cara', 'Dan'].map((name) =>
+    em.create(User, {
+      name: `${name} Test`,
+      email: `${name.toLowerCase()}@test.example`,
+    }),
+  );
+  await em.flush();
+  em.clear();
+  return users;
 }

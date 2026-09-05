@@ -1,6 +1,6 @@
 import { Body, Controller, Get, Param, ParseUUIDPipe, Post } from '@nestjs/common';
 import { DocumentsService } from './documents.service';
-import { ActionDto } from './dto/action.dto';
+import { ApproveDto, RejectDto } from './dto/action.dto';
 import { CreateDocumentDto } from './dto/create-document.dto';
 
 @Controller('documents')
@@ -17,24 +17,23 @@ export class DocumentsController {
     return this.documentsService.findOne(id);
   }
 
+  @Get(':id/history')
+  history(@Param('id', ParseUUIDPipe) id: string) {
+    return this.documentsService.history(id);
+  }
+
   @Post()
   create(@Body() dto: CreateDocumentDto) {
     return this.documentsService.create(dto);
   }
 
   @Post(':id/approve')
-  approve(
-    @Param('id', ParseUUIDPipe) id: string,
-    @Body() dto: ActionDto,
-  ) {
-    return this.documentsService.approve(id, dto.userId);
+  approve(@Param('id', ParseUUIDPipe) id: string, @Body() dto: ApproveDto) {
+    return this.documentsService.approve(id, dto.userId, dto.comment);
   }
 
   @Post(':id/reject')
-  reject(
-    @Param('id', ParseUUIDPipe) id: string,
-    @Body() dto: ActionDto,
-  ) {
-    return this.documentsService.reject(id, dto.userId);
+  reject(@Param('id', ParseUUIDPipe) id: string, @Body() dto: RejectDto) {
+    return this.documentsService.reject(id, dto.userId, dto.comment);
   }
 }

@@ -39,6 +39,10 @@ export class ApprovalEvent {
   @Enum(() => ApprovalAction)
   action!: ApprovalAction;
 
+  /** Which round of review this happened in. See Document.approvalRound. */
+  @Property()
+  round!: number;
+
   /** Required when rejecting — a rejection with no reason is useless. */
   @Property({ type: 'text', nullable: true })
   comment: string | null = null;
