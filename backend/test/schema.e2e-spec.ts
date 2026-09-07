@@ -124,6 +124,26 @@ describe('schema', () => {
       em.clear();
     });
 
+    it('allows two stages to swap positions inside one transaction', async () => {
+      const { document } = await seedDocument(em);
+
+      await em.transactional(async (tx) => {
+        const stages = await tx.find(ApprovalStage, { document: document.id });
+        const first = stages.find((s) => s.position === 0)!;
+        const second = stages.find((s) => s.position === 1)!;
+
+        // Both sit at position 1 for a moment. Postgres would reject that even inside a
+        // single UPDATE, so (document, position) is deferrable and judged at commit.
+        first.position = 1;
+        second.position = 0;
+      });
+
+      const after = await em.find(ApprovalStage, { document: document.id });
+      expect(after.find((s) => s.position === 0)!.name).toBe('Legal Review');
+      expect(after.find((s) => s.position === 1)!.name).toBe('Draft Review');
+      em.clear();
+    });
+
     it('deletes a document stages and their approvers with the document', async () => {
       const { document } = await seedDocument(em);
 

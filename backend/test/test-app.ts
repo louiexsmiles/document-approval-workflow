@@ -64,7 +64,10 @@ export async function createTestApp(): Promise<TestContext> {
           entities: [User, Document, ApprovalStage, StageApprover, ApprovalEvent],
           clientUrl: TEST_DATABASE_URL,
           allowGlobalContext: true,
-          debug: process.env.ORM_DEBUG === "1",
+          debug: process.env.ORM_DEBUG === '1',
+          // resetSchema runs the migrations before every test, so the migrator would
+          // print hundreds of lines between results. ORM_DEBUG=1 brings it all back.
+          logger: process.env.ORM_DEBUG === '1' ? console.log : () => undefined,
           // Registered so the migration tests can run the real migrations. Ordinary
           // tests still build their schema straight from the entities.
           migrations: { path: join(__dirname, '..', 'src', 'migrations') },

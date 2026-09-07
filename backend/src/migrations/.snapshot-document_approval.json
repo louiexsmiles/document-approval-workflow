@@ -344,6 +344,7 @@
           "keyName": "approval_stages_document_id_position_unique",
           "unique": true,
           "primary": false,
+          "deferMode": "deferred",
           "expression": "CREATE UNIQUE INDEX approval_stages_document_id_position_unique ON public.approval_stages USING btree (document_id, \"position\")"
         },
         {
