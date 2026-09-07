@@ -3,8 +3,14 @@ import { notFound } from 'next/navigation';
 import { HistoryTimeline } from '@/components/history-timeline';
 import { StageList } from '@/components/stage-list';
 import { StatusBadge } from '@/components/status-badge';
-import { currentStageOf, getDocument, getDocumentHistory } from '@/lib/api';
+import {
+  currentStageOf,
+  getDocument,
+  getDocumentHistory,
+  getUsers,
+} from '@/lib/api';
 import { ApprovalActions } from './approval-actions';
+import { StageEditor } from './stage-editor';
 
 type Props = {
   params: Promise<{ id: string }>;
@@ -28,8 +34,24 @@ export default async function DocumentDetailPage({ params }: Props) {
     notFound();
   }
 
-  const history = await getDocumentHistory(id);
+  const [history, users] = await Promise.all([getDocumentHistory(id), getUsers()]);
   const current = currentStageOf(document);
+
+  // Which stages the server will refuse to change: those approved in the current round.
+  // Derived from history the page already has, so the editor can disable them rather than
+  // let someone edit into a 409.
+  const lockedStageIds = [
+    ...new Set(
+      history
+        .filter(
+          (event) =>
+            event.round === document.approvalRound &&
+            event.action === 'APPROVE' &&
+            event.stage,
+        )
+        .map((event) => event.stage!.id),
+    ),
+  ];
 
   return (
     <div>
@@ -106,6 +128,16 @@ export default async function DocumentDetailPage({ params }: Props) {
           <section>
             <h2 className="section-label mb-3">Workflow</h2>
             <StageList document={document} />
+
+            {document.status === 'IN_PROGRESS' && (
+              <div className="mt-3">
+                <StageEditor
+                  document={document}
+                  users={users}
+                  lockedStageIds={lockedStageIds}
+                />
+              </div>
+            )}
           </section>
 
           <section className="card card-pad">
