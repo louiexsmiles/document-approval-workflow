@@ -14,3 +14,6 @@ coverage
 
 # MikroORM writes a schema snapshot per database; only the dev one is shared.
 backend/src/migrations/.snapshot-*_test.json
+
+# Next.js incremental typecheck cache
+frontend/tsconfig.tsbuildinfo
