@@ -1,8 +1,9 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
+import { HistoryTimeline } from '@/components/history-timeline';
+import { StageList } from '@/components/stage-list';
 import { StatusBadge } from '@/components/status-badge';
-import { getDocument } from '@/lib/api';
-import { STAGE_LABELS, STAGES } from '@/lib/labels';
+import { currentStageOf, getDocument, getDocumentHistory } from '@/lib/api';
 import { ApprovalActions } from './approval-actions';
 
 type Props = {
@@ -27,16 +28,8 @@ export default async function DocumentDetailPage({ params }: Props) {
     notFound();
   }
 
-  const stages = STAGES.map((stage) => ({
-    stage,
-    label: STAGE_LABELS[stage],
-    approver:
-      stage === 'DRAFT_REVIEW'
-        ? document.draftReviewApprover
-        : stage === 'LEGAL_REVIEW'
-          ? document.legalReviewApprover
-          : document.finalApprovalApprover,
-  }));
+  const history = await getDocumentHistory(id);
+  const current = currentStageOf(document);
 
   return (
     <div>
@@ -50,7 +43,9 @@ export default async function DocumentDetailPage({ params }: Props) {
             <div className="min-w-0">
               <h1 className="page-title">{document.title}</h1>
               <p className="page-subtitle">
-                Current stage: {STAGE_LABELS[document.currentStage]}
+                {current
+                  ? `Waiting at ${current.name}`
+                  : 'No stages remaining'}
               </p>
             </div>
             <StatusBadge status={document.status} />
@@ -65,6 +60,15 @@ export default async function DocumentDetailPage({ params }: Props) {
             </p>
           </section>
 
+          <section className="border-b border-stone-100 px-6 py-6 sm:px-8">
+            <h2 className="text-xs font-semibold uppercase tracking-wider text-stone-500">
+              History
+            </h2>
+            <div className="mt-5">
+              <HistoryTimeline events={history} />
+            </div>
+          </section>
+
           <section className="px-6 py-6 sm:px-8">
             <h2 className="text-xs font-semibold uppercase tracking-wider text-stone-500">
               Details
@@ -77,17 +81,19 @@ export default async function DocumentDetailPage({ params }: Props) {
                 </dd>
               </div>
               <div>
-                <dt className="text-xs font-medium text-stone-400">
-                  Last updated
-                </dt>
+                <dt className="text-xs font-medium text-stone-400">Last updated</dt>
                 <dd className="mt-1 text-sm text-stone-800">
                   {formatDate(document.updatedAt)}
                 </dd>
               </div>
-              <div className="sm:col-span-2">
-                <dt className="text-xs font-medium text-stone-400">
-                  Document ID
-                </dt>
+              <div>
+                <dt className="text-xs font-medium text-stone-400">Review round</dt>
+                <dd className="mt-1 text-sm text-stone-800">
+                  {document.approvalRound + 1}
+                </dd>
+              </div>
+              <div>
+                <dt className="text-xs font-medium text-stone-400">Document ID</dt>
                 <dd className="mt-1 break-all font-mono text-xs text-stone-500">
                   {document.id}
                 </dd>
@@ -98,55 +104,23 @@ export default async function DocumentDetailPage({ params }: Props) {
 
         <aside className="min-w-0 space-y-6 md:sticky md:top-20 md:col-span-1">
           <section>
-            <h2 className="section-label mb-3">Stages</h2>
-            <ol className="space-y-3">
-              {stages.map(({ stage, label, approver }, index) => {
-                const currentIndex = STAGES.indexOf(document.currentStage);
-                const isCurrent =
-                  document.status !== 'APPROVED' &&
-                  document.currentStage === stage;
-                const isDone =
-                  document.status === 'APPROVED' || index < currentIndex;
-
-                return (
-                  <li
-                    key={stage}
-                    className={`card px-5 py-4 ${
-                      isCurrent ? 'border-stone-900 shadow-md' : ''
-                    }`}
-                  >
-                    <div className="flex items-center justify-between gap-4">
-                      <div>
-                        <div className="text-sm font-semibold text-stone-900">
-                          {label}
-                        </div>
-                        <div className="mt-0.5 text-sm text-stone-600">
-                          Approver: {approver.name}
-                        </div>
-                      </div>
-                      <span className="text-xs font-medium text-stone-500">
-                        {document.status === 'APPROVED' &&
-                        stage === 'FINAL_APPROVAL'
-                          ? 'Approved'
-                          : isCurrent
-                            ? 'Current'
-                            : isDone
-                              ? 'Passed'
-                              : 'Pending'}
-                      </span>
-                    </div>
-                  </li>
-                );
-              })}
-            </ol>
+            <h2 className="section-label mb-3">Workflow</h2>
+            <StageList document={document} />
           </section>
 
           <section className="card card-pad">
             <h2 className="section-label">Actions</h2>
-            {document.status === 'APPROVED' ? (
-              <div className="mt-3 rounded-lg bg-emerald-50 px-3.5 py-3 text-sm text-emerald-800 ring-1 ring-inset ring-emerald-100">
-                This document is fully approved. No further actions are
-                available.
+            {document.status !== 'IN_PROGRESS' ? (
+              <div
+                className={`mt-3 rounded-lg px-3.5 py-3 text-sm ring-1 ring-inset ${
+                  document.status === 'APPROVED'
+                    ? 'bg-emerald-50 text-emerald-800 ring-emerald-100'
+                    : 'bg-red-50 text-red-800 ring-red-100'
+                }`}
+              >
+                {document.status === 'APPROVED'
+                  ? 'This document is fully approved. No further actions are available.'
+                  : 'This document was rejected outright and cannot be resubmitted.'}
               </div>
             ) : (
               <ApprovalActions documentId={document.id} />
