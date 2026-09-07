@@ -56,7 +56,17 @@ export type TestContext = {
   close: () => Promise<void>;
 };
 
-export async function createTestApp(): Promise<TestContext> {
+export type TestAppOptions = {
+  /**
+   * Collect every SQL statement the app runs. Lets a test assert on SQL the service emits
+   * but no response can reveal — the row lock, for one, which is invisible from outside
+   * until two processes contend for it.
+   */
+  sql?: string[];
+};
+
+export async function createTestApp(options: TestAppOptions = {}): Promise<TestContext> {
+  const { sql } = options;
   const moduleRef = await Test.createTestingModule({
     imports: [
       MikroOrmModule.forRoot(
@@ -64,10 +74,14 @@ export async function createTestApp(): Promise<TestContext> {
           entities: [User, Document, ApprovalStage, StageApprover, ApprovalEvent],
           clientUrl: TEST_DATABASE_URL,
           allowGlobalContext: true,
-          debug: process.env.ORM_DEBUG === '1',
+          debug: sql ? ['query'] : process.env.ORM_DEBUG === '1',
           // resetSchema runs the migrations before every test, so the migrator would
           // print hundreds of lines between results. ORM_DEBUG=1 brings it all back.
-          logger: process.env.ORM_DEBUG === '1' ? console.log : () => undefined,
+          logger: sql
+            ? (message: string) => sql.push(message)
+            : process.env.ORM_DEBUG === '1'
+              ? console.log
+              : () => undefined,
           // Registered so the migration tests can run the real migrations. Ordinary
           // tests still build their schema straight from the entities.
           migrations: { path: join(__dirname, '..', 'src', 'migrations') },

@@ -60,8 +60,9 @@ export function isStageComplete(
   // Without this check, ALL compares 0 approvals against 0 required, which passes so the
   // document moves past a stage nobody reviewed. Validation blocks these at creation, so
   // reaching here means something skipped it: a bad migration, or a direct database insert.
-  // A stuck document gets noticed; a wrongly approved one does not. Production wise I would wrap this to a slack channel or something. 
-  // Best to fail loudly for afternoon than allow a sleeping dragon to grow. 
+  // A stuck document gets noticed; a wrongly approved one does not. In production I would
+  // wire this to an alert channel. Better to fail loudly for an afternoon than let a
+  // sleeping dragon grow.
   if (stage.approverIds.length === 0) {
     return false;
   }

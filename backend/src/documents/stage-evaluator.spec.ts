@@ -116,6 +116,15 @@ describe('isStageComplete', () => {
       const solo = stage(StageApprovalPolicy.ALL, [ALICE]);
       expect(isStageComplete(solo, [approval(ALICE)], 0)).toBe(true);
     });
+
+    // The service collapses duplicates before a stage is stored, so this shape should not
+    // reach here. Asserted anyway: counting the list instead of the distinct people would
+    // wait forever for a second Alice, and this function is not allowed to assume its
+    // caller cleaned up.
+    it('needs one approval when the same person is listed twice', () => {
+      const doubled = stage(StageApprovalPolicy.ALL, [ALICE, ALICE]);
+      expect(isStageComplete(doubled, [approval(ALICE)], 0)).toBe(true);
+    });
   });
 });
 
