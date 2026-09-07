@@ -8,7 +8,10 @@ import { LockMode } from '@mikro-orm/core';
 import { EntityManager } from '@mikro-orm/postgresql';
 import { User } from '../users/user.entity';
 import { ApprovalAction } from './approval-action.enum';
-import { ApprovalEvent } from './approval-event.entity';
+import {
+  ApprovalEvent,
+  type StageSnapshot as StageSnapshotRecord,
+} from './approval-event.entity';
 import { ApprovalStage } from './approval-stage.entity';
 import { Document } from './document.entity';
 import { StageApprover } from './stage-approver.entity';
@@ -165,6 +168,7 @@ export class DocumentsService {
           action: record.action,
           comment: comment ?? null,
           round: record.round,
+          stageSnapshot: stageSnapshot(stage),
         });
 
         // Added in memory rather than re-reading. The transaction flushes on commit.
@@ -193,6 +197,7 @@ export class DocumentsService {
         action: ApprovalAction.REJECT,
         comment,
         round: document.approvalRound,
+        stageSnapshot: stageSnapshot(stage),
       });
 
       // A new round begins, so approvals collected before this stop counting. Nothing is
@@ -294,6 +299,15 @@ export class DocumentsService {
 function snapshot(stage: ApprovalStage) {
   return {
     id: stage.id,
+    policy: stage.policy,
+    approverIds: stage.approvers.getItems().map((a) => a.user.id),
+  };
+}
+
+/** The stage as it stands now, recorded onto the event so history cannot drift. */
+function stageSnapshot(stage: ApprovalStage): StageSnapshotRecord {
+  return {
+    name: stage.name,
     policy: stage.policy,
     approverIds: stage.approvers.getItems().map((a) => a.user.id),
   };

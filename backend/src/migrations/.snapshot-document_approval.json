@@ -136,6 +136,22 @@
           "comment": null,
           "enumItems": [],
           "mappedType": "integer"
+        },
+        "stage_snapshot": {
+          "name": "stage_snapshot",
+          "type": "jsonb",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": true,
+          "unique": false,
+          "length": null,
+          "precision": null,
+          "scale": null,
+          "default": null,
+          "comment": null,
+          "enumItems": [],
+          "mappedType": "json"
         }
       },
       "name": "approval_events",

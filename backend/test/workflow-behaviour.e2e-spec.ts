@@ -1,6 +1,7 @@
 import request from 'supertest';
 import type { Server } from 'http';
 import { LockMode } from '@mikro-orm/core';
+import { ApprovalStage } from '../src/documents/approval-stage.entity';
 import { Document } from '../src/documents/document.entity';
 import { StageApprovalPolicy } from '../src/documents/stage-approval-policy.enum';
 import { StageRejectBehavior } from '../src/documents/stage-reject-behavior.enum';
@@ -460,6 +461,53 @@ describe('workflow behaviour', () => {
       expect(rejection.stage.name).toBe('Two');
       expect(rejection.actor.id).toBe(bob);
       expect(rejection.round).toBe(0);
+    });
+
+    it('records what the stage looked like at the moment of the action', async () => {
+      const doc = await createDocument([
+        {
+          name: 'Joint Legal',
+          approverIds: [alice, bob],
+          policy: StageApprovalPolicy.ALL,
+        },
+      ]);
+
+      await approve(doc.id, alice).expect(201);
+
+      const history = await request(server).get(`/documents/${doc.id}/history`).expect(200);
+      expect(history.body[0].stageSnapshot).toEqual({
+        name: 'Joint Legal',
+        policy: 'ALL',
+        approverIds: expect.arrayContaining([alice, bob]),
+      });
+    });
+
+    it('keeps the snapshot accurate after the stage itself changes', async () => {
+      // The reason snapshots exist. Without one, renaming a stage would make an old
+      // approval read as though it happened somewhere it did not.
+      const doc = await createDocument([
+        { name: 'Legal Review', approverIds: [alice] },
+        { name: 'Sign-off', approverIds: [bob] },
+      ]);
+
+      await approve(doc.id, alice).expect(201);
+
+      const stageId = (await get(doc.id)).stages.find((s) => s.position === 0)!.id;
+      await ctx.em.nativeUpdate(
+        ApprovalStage,
+        { id: stageId },
+        { name: 'Compliance Review', policy: StageApprovalPolicy.ALL },
+      );
+      ctx.em.clear();
+
+      const history = await request(server).get(`/documents/${doc.id}/history`).expect(200);
+
+      // The event still describes the stage as it was.
+      expect(history.body[0].stageSnapshot.name).toBe('Legal Review');
+      expect(history.body[0].stageSnapshot.policy).toBe('ANY');
+
+      // While the live stage has moved on.
+      expect(history.body[0].stage.name).toBe('Compliance Review');
     });
 
     it('is empty for a document nobody has acted on', async () => {
