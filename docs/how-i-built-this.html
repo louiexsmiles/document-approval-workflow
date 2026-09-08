@@ -1,0 +1,674 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>How I Built This</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700&family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;1,8..60,400&family=JetBrains+Mono:wght@400;500&display=swap">
+
+<style>
+  :root {
+    --paper:      #FCFCFB;
+    --surface:    #FFFFFF;
+    --surface-2:  #F3F4F1;
+    --ink:        #15171C;
+    --slate:      #575D68;
+    --slate-soft: #878D97;
+    --line:       #E2E2DD;
+    --line-soft:  #EDEDE9;
+    --accent:     #33518A;
+    --accent-ink: #26406F;
+    --accent-wash:#ECF0F7;
+    --flag:       #8A5A12;
+    --flag-wash:  #F7F0E2;
+
+    --display: 'Archivo', ui-sans-serif, system-ui, -apple-system, sans-serif;
+    --body: 'Source Serif 4', ui-serif, Georgia, 'Times New Roman', serif;
+    --mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+    --measure: 66ch;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --paper: #101216; --surface: #171A20; --surface-2: #1C1F26;
+      --ink: #E9E9E6; --slate: #A5AAB4; --slate-soft: #767C86;
+      --line: #2A2E36; --line-soft: #23262D;
+      --accent: #94A8DF; --accent-ink: #B4C2EC; --accent-wash: #1B2130;
+      --flag: #D3A657; --flag-wash: #2A2213;
+    }
+  }
+  :root[data-theme="dark"] {
+    --paper: #101216; --surface: #171A20; --surface-2: #1C1F26;
+    --ink: #E9E9E6; --slate: #A5AAB4; --slate-soft: #767C86;
+    --line: #2A2E36; --line-soft: #23262D;
+    --accent: #94A8DF; --accent-ink: #B4C2EC; --accent-wash: #1B2130;
+    --flag: #D3A657; --flag-wash: #2A2213;
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    background: var(--paper); color: var(--ink);
+    font-family: var(--body); font-size: 17px; line-height: 1.68;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 820px; margin: 0 auto; padding: 0 32px 110px; }
+
+  header.top { padding: 72px 0 34px; border-bottom: 2px solid var(--ink); margin-bottom: 8px; }
+  .eyebrow {
+    font-family: var(--mono); font-size: 11px; letter-spacing: .15em;
+    text-transform: uppercase; color: var(--accent); margin: 0 0 20px;
+  }
+  h1 {
+    font-family: var(--display); font-weight: 700; font-size: clamp(32px, 5vw, 46px);
+    line-height: 1.06; letter-spacing: -.02em; margin: 0 0 20px; text-wrap: balance;
+  }
+  .standfirst { font-size: 19px; color: var(--slate); margin: 0; max-width: 60ch; }
+  .byline {
+    font-family: var(--mono); font-size: 12px; color: var(--slate-soft);
+    margin: 26px 0 0; padding-top: 16px; border-top: 1px solid var(--line);
+  }
+
+  section { padding-top: 52px; }
+  h2 {
+    font-family: var(--display); font-weight: 700; font-size: clamp(23px, 3vw, 29px);
+    letter-spacing: -.015em; line-height: 1.16; margin: 0 0 6px; text-wrap: balance;
+  }
+  .sec-kicker {
+    font-family: var(--mono); font-size: 10.5px; letter-spacing: .13em;
+    text-transform: uppercase; color: var(--slate-soft); display: block; margin-bottom: 10px;
+  }
+  h3 {
+    font-family: var(--display); font-weight: 600; font-size: 19px;
+    letter-spacing: -.008em; margin: 34px 0 8px; text-wrap: balance;
+  }
+  p { max-width: var(--measure); margin: 0 0 17px; }
+  strong { font-weight: 600; }
+
+  .lede { font-size: 18.5px; color: var(--slate); margin-top: 14px; }
+
+  ul.plain, ol.plain { max-width: var(--measure); padding-left: 22px; margin: 0 0 18px; }
+  ul.plain li, ol.plain li { margin-bottom: 10px; }
+
+  code {
+    font-family: var(--mono); font-size: .84em; background: var(--surface-2);
+    padding: 1.5px 5px; border-radius: 4px;
+  }
+
+  .pull {
+    border-left: 3px solid var(--accent); padding: 4px 0 4px 22px;
+    margin: 26px 0; max-width: var(--measure);
+  }
+  .pull p { margin: 0; font-size: 18px; }
+  .pull p + p { margin-top: 12px; }
+
+  .note {
+    background: var(--surface-2); border-radius: 9px; padding: 18px 22px;
+    margin: 24px 0; max-width: var(--measure); font-size: 16px; color: var(--slate);
+  }
+  .note strong { color: var(--ink); }
+  .note p:last-child { margin-bottom: 0; }
+  .note.flag { background: var(--flag-wash); }
+
+  .t-scroll { overflow-x: auto; margin: 22px 0; border: 1px solid var(--line); border-radius: 8px; }
+  table { border-collapse: collapse; width: 100%; font-size: 15px; }
+  th {
+    font-family: var(--mono); font-size: 10px; letter-spacing: .09em; text-transform: uppercase;
+    color: var(--slate-soft); text-align: left; padding: 10px 14px; font-weight: 500;
+    background: var(--surface-2); border-bottom: 1px solid var(--line); white-space: nowrap;
+  }
+  td { padding: 10px 14px; border-bottom: 1px solid var(--line-soft); vertical-align: top; }
+  tbody tr:last-child td { border-bottom: none; }
+  td.id { font-family: var(--mono); font-size: 12px; white-space: nowrap; color: var(--accent-ink); }
+  td.mono { font-family: var(--mono); font-size: 12.5px; }
+
+  figure { margin: 30px 0; }
+  figure svg { width: 100%; height: auto; display: block; }
+  figcaption {
+    font-size: 14.5px; color: var(--slate-soft); margin-top: 12px;
+    max-width: var(--measure); font-style: italic;
+  }
+
+  .metrics {
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
+    border-top: 1px solid var(--line); border-bottom: 1px solid var(--line);
+    margin: 30px 0;
+  }
+  .metric { padding: 15px 16px; border-right: 1px solid var(--line); }
+  .metric:last-child { border-right: none; }
+  .metric b {
+    font-family: var(--mono); font-size: 21px; font-weight: 500; display: block;
+    letter-spacing: -.02em;
+  }
+  .metric span {
+    font-family: var(--mono); font-size: 10px; letter-spacing: .08em;
+    text-transform: uppercase; color: var(--slate-soft); display: block; margin-top: 3px;
+  }
+
+  footer.end {
+    margin-top: 64px; padding-top: 24px; border-top: 2px solid var(--ink);
+    color: var(--slate); font-size: 16px;
+  }
+
+  @media (max-width: 620px) {
+    body { font-size: 16px; }
+    .wrap { padding-left: 18px; padding-right: 18px; }
+    .metric { border-right: none; border-bottom: 1px solid var(--line); }
+  }
+
+  @media print {
+    body { background: #fff; color: #000; font-size: 11pt; }
+    .wrap { max-width: 100%; padding: 0 0 0 0; }
+    header.top { padding-top: 0; }
+    section { padding-top: 26pt; page-break-inside: auto; }
+    h2, h3 { page-break-after: avoid; }
+    .note, .pull, figure, .t-scroll { page-break-inside: avoid; }
+    tr { page-break-inside: avoid; }
+  }
+</style>
+<style>body { margin: 0; }</style>
+</head>
+<body>
+
+
+<div class="wrap">
+
+<header class="top">
+  <p class="eyebrow">Narratize · coding assessment</p>
+  <h1>How I Built This</h1>
+  <p class="standfirst">
+    The reasoning behind the dynamic approval workflow — what I planned, where that plan
+    changed, what I chose not to build, and how I worked.
+  </p>
+  <p class="byline">Louis Montes · September 2026 · Built with Claude Code</p>
+</header>
+
+<section>
+  <span class="sec-kicker">Where I started</span>
+  <h2>The plan before I wrote anything</h2>
+
+  <p class="lede">
+    I spent the first day not writing product code. I read the starter, wrote down the target
+    model, and made the design decisions in writing before any of them were expensive to
+    reverse.
+  </p>
+
+  <p>
+    The starter's README was unusually helpful, because it listed its own limitations:
+    three fixed stages held in an enum, exactly one approver per stage stored as three columns
+    on the document, rejection always returning to the first stage, no editing, and no history.
+    That list became my definition of done. If I could remove every item on it, I had rebuilt
+    the thing they asked me to rebuild.
+  </p>
+
+  <p>The target model I settled on before coding:</p>
+
+  <ul class="plain">
+    <li>A document <strong>owns</strong> an ordered list of stages, rather than pointing at a
+      shared definition</li>
+    <li>Each stage carries a name, a set of approvers, a policy for how many must agree, and
+      its own rule for where a rejection sends the document — the original behaviour, sending
+      the whole review back to the start, is still there and is still the default. What changed
+      is that you can now choose something else on top of it</li>
+    <li>The document points at the stage it is waiting at; null means finished</li>
+    <li>Every action writes an append-only event that can never be edited</li>
+  </ul>
+
+  <p>
+    Two things I decided early and did not revisit. The first is that completion is decided by
+    <strong>one pure function</strong> that takes plain data and touches no database, so the
+    rules live in one readable place and can be tested in milliseconds. The second is that
+    history records a <strong>snapshot</strong> of the stage as it was at the moment someone
+    acted, never a live reference to it.
+  </p>
+
+  <div class="pull">
+    <p>
+      That second decision is the one I would defend hardest. If an event points at the live
+      stage, renaming that stage rewrites the past. For an approval system that is not a bug,
+      it is a compliance failure — the same reason an invoice stores the price at time of
+      purchase instead of pointing at today's price.
+    </p>
+  </div>
+
+  <h3>The first thing I wrote was a safety net</h3>
+
+  <p>
+    Before touching the engine I wrote ten tests against the <em>existing</em> static
+    behaviour — but pinned to the guarantees rather than the shape. Not "there are three
+    stages", but "only the current stage's approver may act", "an approved document is
+    terminal", "rejection returns it to a state where someone can act".
+  </p>
+
+  <p>
+    Those are true of any approval workflow, so they survived the rewrite. I also put a single
+    file between the tests and the response shape. When the model changed, that one file
+    changed and the assertions did not. Ten tests written against three hardcoded stages still
+    pass against arbitrary ones.
+  </p>
+</section>
+
+<section>
+  <span class="sec-kicker">Where the plan moved</span>
+  <h2>What I added past the literal ask, and why</h2>
+
+  <p class="lede">
+    The brief was "rebuild this workflow to be dynamic per document". Several things I built
+    go past that sentence. I kept a running log of each one with its justification, so the
+    additions would read as decisions rather than drift.
+  </p>
+
+  <p>
+    If this had been a feature handed to me on a real team, these are the items I would have
+    raised at stand-up to be either pulled into the sprint or written up for the next one.
+    Working alone off a single brief, I made the call myself and wrote down my reasoning so it
+    can be argued with.
+  </p>
+
+  <div class="t-scroll">
+    <table>
+      <thead><tr><th>Added</th><th>Why it belongs</th></tr></thead>
+      <tbody>
+        <tr><td><strong>Audit trail</strong></td><td>The starter recorded nothing — approve and reject mutated a column and left no trace. An approval product exists to answer <em>who agreed to what, and when</em>. Without history it only answers what is true right now, which is the smaller half.</td></tr>
+        <tr><td><strong>Per-stage reject routing</strong></td><td>"All the ways a customer might need to adjust how a document goes through a workflow" covers where a rejection lands. "Legal sends it back to Budget, but the CFO refuses outright" is an ordinary pattern. Cost: one enum column.</td></tr>
+        <tr><td><strong>A <code>REJECTED</code> status</strong></td><td>With only in-progress and approved, a document that has been definitively refused sits in progress forever. That is the status field misreporting reality, and it separates <em>send back for revision</em> from <em>refuse outright</em> — two things the word "reject" was conflating.</td></tr>
+        <tr><td><strong>Round counter</strong></td><td>A rejection has to stop earlier approvals counting. The obvious way compares timestamps, but those come from the API process and two servers with drifting clocks can order events wrongly — silently discarding a valid approval. An integer removes the dependency on clocks entirely.</td></tr>
+        <tr><td><strong>Row locking</strong></td><td>The original could not have a concurrency problem: one approver per stage meant one possible actor. Allowing several approvers removes that guarantee. Introduced by the feature, so handled with it.</td></tr>
+        <tr><td><strong>A database consistency trigger</strong></td><td>Status and current-stage encode one fact between them and nothing enforced they agree.</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="note">
+    <p>
+      <strong>That last one paid for itself immediately.</strong> Building the guard found two
+      defects nobody knew about: every document was committing in an invalid state on creation,
+      and deleting the stage a document was waiting at stranded it silently. Neither was found
+      by looking for bugs. Both were found by trying to write down a rule the system was
+      supposed to already obey.
+    </p>
+  </div>
+
+  <h3>What I deliberately did not build</h3>
+
+  <p>
+    Reusable workflow templates, workflow versioning, parallel and conditional stages,
+    role-based approvers, delegation, notifications. Each is a scope decision with a cost I
+    can state.
+  </p>
+
+  <p>
+    Templates are the one I expect to be asked about. The ask was dynamic <em>per document</em>,
+    and per-document stages are the foundation templates sit on rather than a lesser version of
+    them. Adding them later is two tables and a copy step at creation — no rework, no data
+    migration. The expensive part is the management UI, which is not what this exercise tests.
+  </p>
+
+  <p>
+    Versioning is the more interesting cut. It is the genuinely correct answer to editing a
+    workflow that is already in flight, because it preserves both full editability and truthful
+    history. It needs a version table and version pointers on every event. I chose event
+    snapshots plus a lock on approved stages instead, which covers the same failure at a
+    fraction of the cost — and I would take it to versioning in production.
+  </p>
+</section>
+
+<section>
+  <span class="sec-kicker">How I worked</span>
+  <h2>Using AI as a working colleague</h2>
+
+  <p class="lede">
+    You said to use AI as I would if I were an engineer on the team, so I did. I used
+    <strong>Claude Code</strong> throughout, and I set it up the way I would want a teammate set
+    up: with written rules, a decision log, and a ticket board it had to work through.
+  </p>
+
+  <p>
+    I kept a private working directory alongside the repo — never committed, and not part of
+    this submission — holding the operating rules, the decision records, the ticket board, an
+    edge-case register, and a knowledge file that grew as we hit things the hard way. That
+    directory is why the work stayed coherent across three working days rather than becoming a
+    pile of plausible code — Friday, then Monday and Tuesday, with the delivery pulled forward
+    a day partway through.
+  </p>
+
+  <figure>
+    <svg viewBox="0 0 720 320" role="img" aria-label="Diagram of the working files and how each one fed the repository">
+      <defs>
+        <marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+          <path d="M0,0 L10,5 L0,10 z" fill="currentColor"/>
+        </marker>
+      </defs>
+      <g font-family="JetBrains Mono, monospace" font-size="11">
+
+        <text x="8" y="16" fill="var(--slate-soft)" letter-spacing="1.4">WORKING FILES — NOT SHIPPED</text>
+        <text x="510" y="16" fill="var(--slate-soft)" letter-spacing="1.4">THE REPOSITORY</text>
+
+        <g fill="var(--surface)" stroke="var(--line)">
+          <rect x="8"  y="30"  width="190" height="42" rx="7"/>
+          <rect x="8"  y="84"  width="190" height="42" rx="7"/>
+          <rect x="8"  y="138" width="190" height="42" rx="7"/>
+          <rect x="8"  y="192" width="190" height="42" rx="7"/>
+          <rect x="8"  y="246" width="190" height="42" rx="7"/>
+        </g>
+        <g fill="var(--ink)" font-size="12">
+          <text x="22" y="49">RULES.md</text>
+          <text x="22" y="103">DECISIONS.md</text>
+          <text x="22" y="157">TICKETS.md</text>
+          <text x="22" y="211">EDGE-CASES.md</text>
+          <text x="22" y="265">knowledge/</text>
+        </g>
+        <g fill="var(--slate-soft)" font-size="10">
+          <text x="22" y="63">how the work gets done</text>
+          <text x="22" y="117">12 decision records</text>
+          <text x="22" y="171">49 tickets</text>
+          <text x="22" y="225">~50 cases, each resolved</text>
+          <text x="22" y="279">things learned the hard way</text>
+        </g>
+
+        <g stroke="var(--accent)" fill="none" stroke-width="1.4" color="var(--accent)" marker-end="url(#ar)">
+          <path d="M198 51 C 300 51, 330 60, 428 60"/>
+          <path d="M198 105 C 300 105, 330 110, 428 112"/>
+          <path d="M198 159 C 300 159, 330 162, 428 164"/>
+          <path d="M198 213 C 300 213, 330 212, 428 216"/>
+          <path d="M198 267 C 300 267, 330 264, 428 268"/>
+        </g>
+
+        <g fill="var(--accent-wash)" stroke="var(--accent)" stroke-opacity=".45">
+          <rect x="436" y="42"  width="276" height="36" rx="7"/>
+          <rect x="436" y="94"  width="276" height="36" rx="7"/>
+          <rect x="436" y="146" width="276" height="36" rx="7"/>
+          <rect x="436" y="198" width="276" height="36" rx="7"/>
+          <rect x="436" y="250" width="276" height="36" rx="7"/>
+        </g>
+        <g fill="var(--accent-ink)" font-size="11.5">
+          <text x="452" y="65">every commit, reviewed before it landed</text>
+          <text x="452" y="117">the shape of the schema and the engine</text>
+          <text x="452" y="169">25 commits, each naming its ticket</text>
+          <text x="452" y="221">guards, and one bug found on the last day</text>
+          <text x="452" y="273">fewer repeated mistakes</text>
+        </g>
+      </g>
+    </svg>
+    <figcaption>
+      The working files are not in the repository — they are how I worked, not what I built.
+      I have described them here because the process is part of what you asked to see.
+    </figcaption>
+  </figure>
+
+  <h3>The rules mattered more than I expected</h3>
+
+  <p>
+    I wrote an operating agreement on day one and it shaped the output repeatedly. A few that
+    earned their place:
+  </p>
+
+  <ul class="plain">
+    <li><strong>I never handed over a commit I had not read.</strong> Every change came with a
+      written summary of what moved and why before I committed it. A commit I cannot explain is
+      a liability, not progress.</li>
+    <li><strong>A decision gets written down before it gets built</strong>, not after. Twelve
+      decision records exist because of this, and several of them changed shape while being
+      written — which is cheaper than changing shape after the migration.</li>
+    <li><strong>Comments explain why, never what.</strong> When one drifted into narrating an
+      approach I had already abandoned, it got cut — a comment that misdescribes the code is
+      worse than none.</li>
+    <li><strong>Boring and explainable beats clever.</strong> An ordered list with a policy enum
+      does the job; a generic rules engine would not have been readable in one sitting.</li>
+    <li><strong>Watch every guard fail before trusting it.</strong> This one saved me three
+      times. More below.</li>
+  </ul>
+
+  <h3>Where it actually saved time</h3>
+
+  <p>
+    The honest answer is not "it wrote the code faster". It is that I could run two tracks at
+    once. On the final evening I had the full integration suite running a hundred consecutive
+    times in the background — hunting an intermittent failure — while I worked through the
+    interface by hand at the front. Neither blocked the other. Alone, I would have picked one.
+  </p>
+
+  <p>
+    The same pattern appeared throughout: mutation-testing the suite while I reviewed
+    documentation, replaying migrations while I clicked through the app. The leverage was in
+    parallelism and in never losing the thread, not in typing speed.
+  </p>
+
+  <div class="note">
+    <p>
+      <strong>What I did not delegate.</strong> The scoping, the design decisions, and the call
+      on what not to build. Every decision record was argued through before code existed, and I
+      reviewed the complete diff myself before submitting. Nothing shipped that I cannot explain
+      unprompted — which is what this document is for.
+    </p>
+  </div>
+</section>
+
+<section>
+  <span class="sec-kicker">What the process caught</span>
+  <h2>Three things found by looking twice</h2>
+
+  <p class="lede">
+    The most useful habit I kept was distrusting a green test suite. Three times a test passed
+    while proving nothing, and each time the fix was to break the thing it protected and check
+    it went red.
+  </p>
+
+  <p>
+    Late on the final day I went further and mutation-tested the whole suite — breaking each
+    guarantee in the production code one at a time to see whether any test noticed. Eleven
+    mutations, nine caught. The two that were not are the interesting ones.
+  </p>
+
+  <p>
+    One was a test named for the row lock that <em>took the lock itself</em> in the test body.
+    It proved PostgreSQL works, which was never in doubt, and never touched my service —
+    deleting the lock from the code left all 86 tests green. I replaced it with one that asserts
+    the SQL the service actually emits, because a single process cannot contend with itself and
+    there is no behavioural way to observe it.
+  </p>
+
+  <div class="note flag">
+    <p>
+      <strong>And one bug came directly from a note I wrote on day one.</strong> While designing
+      the editing rules I recorded a case I could not yet handle — inserting a stage behind the
+      point a document had already reached, where nobody could ever approve it — and marked it
+      "leaning: block, revisit when the endpoint exists". You cannot fix something that has not
+      been written yet, so I wrote the core first and left the note.
+    </p>
+    <p>
+      Re-reading that register on the last day found the case still open, and the API still
+      accepted it. A document could finish having silently skipped a stage. Fixing it exposed a
+      second route to the same outcome — reordering an existing stage rather than adding a new
+      one — which only appears after a rejection, when nothing is locked. Both are closed and
+      both are tested.
+    </p>
+  </div>
+
+  <p>
+    Nothing in my test suite would have found that. It came from having written the concern
+    down at the moment I noticed it, and from going back to read what I had written.
+  </p>
+
+  <h3>And one I got wrong twice before getting it right</h3>
+
+  <p>
+    On the last evening I found that renaming a stage saved correctly but the panel beside the
+    editor kept showing the old name until you navigated away. The data was never wrong — the
+    database, the API and the history all had the change. Purely cosmetic.
+  </p>
+
+  <p>
+    My first fix made the panel update and introduced a far worse failure: the editor could
+    hang with the save button spinning indefinitely. My second failed silently in a way I would
+    not have caught without instrumentation. Only when I stopped reasoning about React and
+    watched the network did it become obvious — the refresh request fires and the server
+    answers, and closing the editor in the same update discards the result before it lands.
+  </p>
+
+  <div class="note">
+    <p>
+      <strong>The reason I am including this.</strong> Both bad fixes passed the check I had
+      given them — I confirmed each one solved the original symptom and shipped. Neither time did
+      I ask what new failure I might have created. The third attempt worked because I got
+      evidence first instead of a theory. And I kept the version that is slightly less elegant,
+      because the tidier one demonstrably did not work.
+    </p>
+  </div>
+</section>
+
+<section>
+  <span class="sec-kicker">The board</span>
+  <h2>How the work was broken up</h2>
+
+  <p class="lede">
+    Forty-nine tickets across six phases. Every feature and fix commit names the ticket it
+    belongs to, so the history reads as a sequence of decisions rather than a series of saves.
+  </p>
+
+  <div class="metrics">
+    <div class="metric"><b>49</b><span>Tickets</span></div>
+    <div class="metric"><b>27</b><span>Commits</span></div>
+    <div class="metric"><b>116</b><span>Tests</span></div>
+    <div class="metric"><b>9</b><span>Migrations</span></div>
+    <div class="metric"><b>12</b><span>Decisions</span></div>
+  </div>
+
+  <p>
+    The phases run design → schema → engine → interface → verification. That order is
+    deliberate: the schema decisions are the expensive ones to reverse, so they came after the
+    design was written down and before anything depended on them.
+  </p>
+
+  <p>
+    <strong>Some tickets were combined at commit time and some were split.</strong> The schema
+    tickets landed together because three entities and their migration are one reviewable idea —
+    splitting them would produce commits that do not compile. The stage-editing endpoint went the
+    other way and split into four, because the deferrable-uniqueness migration and the event
+    snapshot each stand on their own and each needed its own explanation. I let the commit
+    boundary follow what a reviewer would want to read in one sitting, not the ticket boundary.
+  </p>
+
+  <p>
+    Work was separated into <strong>backend</strong>, <strong>frontend</strong> and
+    <strong>verification</strong> tracks. The backend finished first because the interface has
+    nothing to render until the model is real, and verification was continuous rather than a
+    phase at the end — the invariant tests existed before the rewrite started.
+  </p>
+
+  <h3>Everything on the board</h3>
+
+  <div class="t-scroll">
+    <table>
+      <thead><tr><th>Phase</th><th>ID</th><th>Ticket</th><th>Status</th></tr></thead>
+      <tbody>
+        <tr><td rowspan="4" class="mono">Foundation</td><td class="id">T-01</td><td>Working files: rules, tickets, architecture, decisions, edge cases</td><td class="mono">shipped</td></tr>
+        <tr><td class="id">T-02</td><td>Commit the pristine starter as a baseline, work on a branch</td><td class="mono">shipped</td></tr>
+        <tr><td class="id">T-03</td><td>Add the Jest harness the starter had stripped out</td><td class="mono">shipped</td></tr>
+        <tr><td class="id">T-04</td><td>Invariant tests against the old behaviour — the safety net</td><td class="mono">shipped</td></tr>
+
+        <tr><td rowspan="5" class="mono">Design</td><td class="id">T-05</td><td>Lock scope; write the target model</td><td class="mono">shipped</td></tr>
+        <tr><td class="id">T-06</td><td>Decision: per-document stages now, templates deferred</td><td class="mono">shipped</td></tr>
+        <tr><td class="id">T-07</td><td>Decision: snapshot, never a live reference</td><td class="mono">shipped</td></tr>
+        <tr><td class="id">T-08</td><td>Decision: approved stages are immutable</td><td class="mono">shipped</td></tr>
+        <tr><td class="id">T-09</td><td>Decision: reject behaviour, reset semantics, required reason</td><td class="mono">shipped</td></tr>
+
+        <tr><td rowspan="7" class="mono">Schema</td><td class="id">T-10</td><td>Stage and approver entities, policy and reject enums</td><td class="mono">shipped</td></tr>
+        <tr><td class="id">T-11</td><td>Append-only approval event entity</td><td class="mono">shipped</td></tr>
+        <tr><td class="id">T-12</td><td>Migration: create the new tables (additive only)</td><td class="mono">shipped</td></tr>
+        <tr><td class="id">T-13</td><td>Data migration: approver columns into stage rows</td><td class="mono">shipped</td></tr>
+        <tr><td class="id">T-13b</td><td>Schema-drift and constraint tests</td><td class="mono">shipped</td></tr>
+        <tr><td class="id">T-14</td><td>Migration: drop the old columns (the destructive step, last)</td><td class="mono">shipped</td></tr>
+        <tr><td class="id">T-16b</td><td>Migration: current-stage pointer and round columns</td><td class="mono">shipped</td></tr>
+
+        <tr><td rowspan="11" class="mono">Engine</td><td class="id">T-16</td><td>Pure stage-completion evaluator plus unit tests</td><td class="mono">shipped</td></tr>
+        <tr><td class="id">T-17</td><td>Rewrite approve around the evaluator</td><td class="mono">shipped</td></tr>
+        <tr><td class="id">T-18</td><td>Rewrite reject: per-stage target, approval reset</td><td class="mono">shipped</td></tr>
+        <tr><td class="id">T-18b</td><td>Terminal rejection and the rejected status</td><td class="mono">shipped</td></tr>
+        <tr><td class="id">T-19</td><td>Rewrite create to accept a dynamic stage definition</td><td class="mono">shipped</td></tr>
+        <tr><td class="id">T-20</td><td>New request validation for dynamic stages</td><td class="mono">shipped</td></tr>
+        <tr><td class="id">T-21</td><td>Stage-editing endpoint with the immutability lock</td><td class="mono">shipped</td></tr>
+        <tr><td class="id">T-21b</td><td>Quiet the test output; gate the ORM logger</td><td class="mono">shipped</td></tr>
+        <tr><td class="id">T-21c</td><td>Migration: deferrable positions so reorders survive</td><td class="mono">shipped</td></tr>
+        <tr><td class="id">T-21d</td><td>Record the stage as it was at action time</td><td class="mono">shipped</td></tr>
+        <tr><td class="id">T-22</td><td>History endpoint</td><td class="mono">shipped</td></tr>
+
+        <tr><td rowspan="6" class="mono">Interface</td><td class="id">T-27</td><td>Retype the API client for the dynamic model</td><td class="mono">shipped</td></tr>
+        <tr><td class="id">T-28</td><td>Detail page: dynamic stage list with approvers and policy</td><td class="mono">shipped</td></tr>
+        <tr><td class="id">T-29</td><td>History timeline grouped by round, reading the snapshot</td><td class="mono">shipped</td></tr>
+        <tr><td class="id">T-30</td><td>Stage builder: add, remove, reorder, multiple approvers</td><td class="mono">shipped</td></tr>
+        <tr><td class="id">T-31</td><td>Stage editor on a live document, respecting the lock</td><td class="mono">shipped</td></tr>
+        <tr><td class="id">T-43</td><td>Expose per-stage reject behaviour; seed an example of it</td><td class="mono">shipped</td></tr>
+
+        <tr><td rowspan="6" class="mono">Verification</td><td class="id">T-33</td><td>Integration suite: flows, reject targets, rounds, seed, errors</td><td class="mono">shipped</td></tr>
+        <tr><td class="id">T-40</td><td>Mutation audit; close the two guarantees nothing defended</td><td class="mono">shipped</td></tr>
+        <tr><td class="id">T-34</td><td>Edge-case pass — found the stranded-stage bug</td><td class="mono">shipped</td></tr>
+        <tr><td class="id">T-35</td><td>Rewrite the README; repair the reference queries</td><td class="mono">shipped</td></tr>
+        <tr><td class="id">T-36</td><td>Fresh-clone verification from scratch</td><td class="mono">shipped</td></tr>
+        <tr><td class="id">T-42</td><td>Diagnose and fix the intermittent test failure</td><td class="mono">shipped</td></tr>
+
+        <tr><td rowspan="8" class="mono">Deferred</td><td class="id">T-15</td><td>Workflow template entities</td><td class="mono">next</td></tr>
+        <tr><td class="id">T-23</td><td>Template endpoints and create-from-template</td><td class="mono">next</td></tr>
+        <tr><td class="id">T-32</td><td>Template management UI</td><td class="mono">next</td></tr>
+        <tr><td class="id">T-24</td><td>Quorum-of-K approval policy</td><td class="mono">later</td></tr>
+        <tr><td class="id">T-25</td><td>Optional and skippable stages</td><td class="mono">later</td></tr>
+        <tr><td class="id">T-26</td><td>Self-approval prevention (needs an author on the document)</td><td class="mono">later</td></tr>
+        <tr><td class="id">T-39</td><td>Drag-and-drop reordering — buttons work and are keyboard-accessible</td><td class="mono">cut</td></tr>
+        <tr><td class="id">T-41</td><td>Unit tests for the form's pure helpers</td><td class="mono">cut</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <p>
+    The deferred rows are not a wish list. <strong>Next</strong> means I would start there on
+    Monday and the schema already accommodates it. <strong>Later</strong> means it is real work
+    with a real design question attached. <strong>Cut</strong> means I decided the cost was not
+    worth it and I can defend that — drag-and-drop is presentation on top of reordering that
+    already works and is keyboard-accessible, and the form helpers are covered indirectly
+    through the API suite.
+  </p>
+</section>
+
+<section>
+  <span class="sec-kicker">Finally</span>
+  <h2>What I would have done differently on a team</h2>
+
+  <p>
+    Almost all of it the same, with one difference: I would have asked. Several of the calls in
+    here — how far to take rejection routing, whether editing a live workflow is in scope at all,
+    whether history deserved a table on day one — are exactly the questions I would have raised
+    at stand-up and let the room settle in two minutes.
+  </p>
+
+  <p>
+    Working from a single brief, I made those calls myself and wrote down the reasoning so they
+    can be argued with rather than guessed at. If any of them are wrong, the record of why is
+    there, and most of them are cheap to reverse because the decision was made before the
+    schema depended on it.
+  </p>
+
+  <div class="pull">
+    <p>
+      The thing I would most want you to take from this: I treated an exercise with no real data
+      as though the data were real. The migrations are sequenced so the old code keeps working
+      until the new code is proven and the destructive step comes last. I verified the data
+      migration by running the same query against the old columns and the new tables and
+      comparing them row by row. None of that was necessary here. It is how I would want it done
+      if it mattered.
+    </p>
+  </div>
+
+  <footer class="end">
+    <p style="margin:0">
+      The repository carries the full history, one commit per decision. This document, the
+      setup guide, and the code are meant to be read together — and I am looking forward to
+      walking through any part of it.
+    </p>
+  </footer>
+</section>
+
+</div>
+
+</body>
+</html>

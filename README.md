@@ -4,6 +4,10 @@ Documents move through an approval workflow that belongs to the document, not to
 system. Any number of stages, any number of approvers on each, and per-stage rules for how
 many must agree and where a rejection sends it.
 
+**[How I Built This](docs/HOW-I-BUILT-THIS.md)** — the reasoning behind the design, what I
+added past the literal ask and why, what I deliberately left out, and how the work was
+broken up. Written to be read alongside the code.
+
 ## Quick start
 
 ```bash
