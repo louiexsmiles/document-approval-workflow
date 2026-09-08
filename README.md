@@ -168,9 +168,11 @@ the new code is proven and the destructive step comes last: create the new table
 three approver columns into stage rows, add the current-stage pointer and round columns,
 drop the old columns, then add a consistency trigger.
 
-`docs/queries.sql` has reference queries for inspecting a document's workflow, who has
-approved in the current round, and a full audit trail. Connect to
-`postgresql://postgres:postgres@localhost:5432/document_approval` while the stack is running.
+`docs/queries.sql` has reference queries: what every document is waiting on, each full
+workflow with its reject routing, the complete audit trail by round, and one that returns
+any event whose recorded stage name differs from what that stage is called now — the
+snapshot behaviour, visible in SQL. Run it against
+`postgresql://postgres:postgres@localhost:5432/document_approval` while the stack is up.
 
 ## Deliberately not built
 
