@@ -105,6 +105,10 @@ an approval **in the current round** are frozen — name, approvers, policy and 
 Everything ahead of the work stays editable, and the stage a document is currently waiting
 at cannot be deleted.
 
+Edits also apply forward: a stage cannot end up **behind** the point the document has
+reached, whether by adding it there or by reordering an existing one into that position.
+Nobody could ever approve it, so the document would finish having skipped a stage.
+
 Edits are sent as the whole list rather than as individual operations, so a reorder either
 applies completely or not at all.
 
