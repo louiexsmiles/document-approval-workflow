@@ -1,7 +1,7 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import { useState, useTransition } from 'react';
+import { useState } from 'react';
 import { Spinner } from '@/components/spinner';
 import {
   blankStage,
@@ -52,10 +52,7 @@ export function StageEditor({ document, users, lockedStageIds }: Props) {
   );
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
-  const [refreshing, startRefresh] = useTransition();
-
-  // The save is not done until the refreshed page has arrived, so treat both as busy.
-  const busy = saving || refreshing;
+  const busy = saving;
 
   function reset() {
     setStages(toDrafts(document, lockedStageIds));
@@ -95,12 +92,8 @@ export function StageEditor({ document, users, lockedStageIds }: Props) {
 
     try {
       await updateStages(document.id, toStageInputs(stages));
-      // One transition, so both commit once the refresh lands. Closing on its own commits
-      // immediately, and the collapsing subtree takes the pending refresh with it.
-      startRefresh(() => {
-        router.refresh();
-        setOpen(false);
-      });
+      setOpen(false);
+      requestAnimationFrame(() => router.refresh());
     } catch (err) {
       if (err instanceof ApiError && err.status === 409) {
         setError(err.message);
