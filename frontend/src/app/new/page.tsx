@@ -8,7 +8,7 @@ export default async function NewDocumentPage() {
     <div>
       <h1 className="page-title">New document</h1>
       <p className="page-subtitle">
-        Create a document and assign one approver for each stage.
+        Create a document and build the workflow it has to go through.
       </p>
       <div className="mt-8">
         <NewDocumentForm users={users} />

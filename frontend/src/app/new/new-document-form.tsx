@@ -3,65 +3,74 @@
 import { useRouter } from 'next/navigation';
 import { FormEvent, useState } from 'react';
 import { Spinner } from '@/components/spinner';
-import { createDocument, type User } from '@/lib/api';
-
-type FieldErrors = {
-  title?: string;
-  body?: string;
-  draftReviewApproverId?: string;
-  legalReviewApproverId?: string;
-  finalApprovalApproverId?: string;
-};
+import {
+  blankStage,
+  firstStageProblem,
+  moveStage,
+  StageFields,
+  type StageDraft,
+} from '@/components/stage-fields';
+import { createDocument, type StageInput, type User } from '@/lib/api';
 
 export function NewDocumentForm({ users }: { users: User[] }) {
   const router = useRouter();
+  const [title, setTitle] = useState('');
+  const [body, setBody] = useState('');
+  const [stages, setStages] = useState<StageDraft[]>([
+    blankStage('Draft Review'),
+    blankStage('Final Approval'),
+  ]);
   const [error, setError] = useState<string | null>(null);
-  const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
   const [submitting, setSubmitting] = useState(false);
 
-  const defaultUserId = users[0]?.id ?? '';
+  function patchStage(key: string, patch: Partial<StageDraft>) {
+    setStages((current) =>
+      current.map((stage) => (stage.key === key ? { ...stage, ...patch } : stage)),
+    );
+  }
 
-  function validate(form: FormData): FieldErrors {
-    const next: FieldErrors = {};
-    const title = String(form.get('title') ?? '').trim();
-    const body = String(form.get('body') ?? '').trim();
-
-    if (!title) next.title = 'Title is required.';
-    if (!body) next.body = 'Body is required.';
-    if (!String(form.get('draftReviewApproverId') ?? '')) {
-      next.draftReviewApproverId = 'Select an approver.';
-    }
-    if (!String(form.get('legalReviewApproverId') ?? '')) {
-      next.legalReviewApproverId = 'Select an approver.';
-    }
-    if (!String(form.get('finalApprovalApproverId') ?? '')) {
-      next.finalApprovalApproverId = 'Select an approver.';
-    }
-    return next;
+  function toggleApprover(key: string, userId: string) {
+    setStages((current) =>
+      current.map((stage) =>
+        stage.key === key
+          ? {
+              ...stage,
+              approverIds: stage.approverIds.includes(userId)
+                ? stage.approverIds.filter((id) => id !== userId)
+                : [...stage.approverIds, userId],
+            }
+          : stage,
+      ),
+    );
   }
 
   async function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    setError(null);
 
-    const form = new FormData(event.currentTarget);
-    const errors = validate(form);
-    setFieldErrors(errors);
-    if (Object.keys(errors).length > 0) {
+    const problem =
+      (!title.trim() && 'The document needs a title.') ||
+      (!body.trim() && 'The document needs a body.') ||
+      firstStageProblem(stages);
+
+    if (problem) {
+      setError(problem);
       return;
     }
 
+    setError(null);
     setSubmitting(true);
+
+    const payload: StageInput[] = stages.map((stage) => ({
+      name: stage.name.trim(),
+      approverIds: stage.approverIds,
+      policy: stage.policy,
+    }));
 
     try {
       const document = await createDocument({
-        title: String(form.get('title') ?? '').trim(),
-        body: String(form.get('body') ?? '').trim(),
-        draftReviewApproverId: String(form.get('draftReviewApproverId') ?? ''),
-        legalReviewApproverId: String(form.get('legalReviewApproverId') ?? ''),
-        finalApprovalApproverId: String(
-          form.get('finalApprovalApproverId') ?? '',
-        ),
+        title: title.trim(),
+        body: body.trim(),
+        stages: payload,
       });
       router.push(`/documents/${document.id}`);
       router.refresh();
@@ -83,57 +92,66 @@ export function NewDocumentForm({ users }: { users: User[] }) {
   }
 
   return (
-    <form onSubmit={onSubmit} className="card card-pad space-y-6" noValidate>
-      <label className="field">
-        <span className="field-label">Title</span>
-        <input
-          name="title"
-          className={`input ${fieldErrors.title ? 'input-error' : ''}`}
-          placeholder="e.g. Vendor Onboarding Policy"
-          aria-invalid={Boolean(fieldErrors.title)}
-        />
-        {fieldErrors.title && (
-          <span className="field-error">{fieldErrors.title}</span>
-        )}
-      </label>
+    <form onSubmit={onSubmit} className="space-y-6" noValidate>
+      <div className="card card-pad space-y-6">
+        <label className="field">
+          <span className="field-label">Title</span>
+          <input
+            value={title}
+            onChange={(event) => setTitle(event.target.value)}
+            className="input"
+            placeholder="e.g. Vendor Onboarding Policy"
+          />
+        </label>
 
-      <label className="field">
-        <span className="field-label">Body</span>
-        <textarea
-          name="body"
-          rows={7}
-          className={`input resize-y ${fieldErrors.body ? 'input-error' : ''}`}
-          placeholder="Document content…"
-          aria-invalid={Boolean(fieldErrors.body)}
-        />
-        {fieldErrors.body && (
-          <span className="field-error">{fieldErrors.body}</span>
-        )}
-      </label>
+        <label className="field">
+          <span className="field-label">Body</span>
+          <textarea
+            value={body}
+            onChange={(event) => setBody(event.target.value)}
+            rows={7}
+            className="input resize-y"
+            placeholder="Document content…"
+          />
+        </label>
+      </div>
 
-      <div className="space-y-5 border-t border-stone-100 pt-6">
-        <p className="section-label">Approvers</p>
-        <ApproverSelect
-          name="draftReviewApproverId"
-          label="Draft Review"
-          users={users}
-          defaultValue={defaultUserId}
-          error={fieldErrors.draftReviewApproverId}
-        />
-        <ApproverSelect
-          name="legalReviewApproverId"
-          label="Legal Review"
-          users={users}
-          defaultValue={users[1]?.id ?? defaultUserId}
-          error={fieldErrors.legalReviewApproverId}
-        />
-        <ApproverSelect
-          name="finalApprovalApproverId"
-          label="Final Approval"
-          users={users}
-          defaultValue={users[2]?.id ?? defaultUserId}
-          error={fieldErrors.finalApprovalApproverId}
-        />
+      <div className="card card-pad space-y-5">
+        <div className="flex items-end justify-between gap-4">
+          <div>
+            <p className="section-label">Approval workflow</p>
+            <p className="mt-1 text-sm text-stone-500">
+              Stages run in the order shown. Each needs at least one approver.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => setStages((current) => [...current, blankStage()])}
+            className="btn btn-secondary shrink-0"
+          >
+            Add stage
+          </button>
+        </div>
+
+        <ol className="space-y-4">
+          {stages.map((stage, index) => (
+            <StageFields
+              key={stage.key}
+              stage={stage}
+              index={index}
+              total={stages.length}
+              users={users}
+              onChange={(patch) => patchStage(stage.key, patch)}
+              onToggleApprover={(userId) => toggleApprover(stage.key, userId)}
+              onMove={(direction) =>
+                setStages((current) => moveStage(current, index, direction))
+              }
+              onRemove={() =>
+                setStages((current) => current.filter((s) => s.key !== stage.key))
+              }
+            />
+          ))}
+        </ol>
       </div>
 
       {error && (
@@ -142,49 +160,10 @@ export function NewDocumentForm({ users }: { users: User[] }) {
         </p>
       )}
 
-      <div className="flex items-center gap-3 border-t border-stone-100 pt-6">
-        <button
-          type="submit"
-          disabled={submitting}
-          className="btn btn-primary min-w-[10rem]"
-        >
-          {submitting && <Spinner />}
-          {submitting ? 'Creating…' : 'Create document'}
-        </button>
-      </div>
+      <button type="submit" disabled={submitting} className="btn btn-primary min-w-[10rem]">
+        {submitting && <Spinner />}
+        {submitting ? 'Creating…' : 'Create document'}
+      </button>
     </form>
-  );
-}
-
-function ApproverSelect({
-  name,
-  label,
-  users,
-  defaultValue,
-  error,
-}: {
-  name: string;
-  label: string;
-  users: User[];
-  defaultValue: string;
-  error?: string;
-}) {
-  return (
-    <label className="field">
-      <span className="field-label">{label}</span>
-      <select
-        name={name}
-        defaultValue={defaultValue}
-        className={`input ${error ? 'input-error' : ''}`}
-        aria-invalid={Boolean(error)}
-      >
-        {users.map((user) => (
-          <option key={user.id} value={user.id}>
-            {user.name} ({user.email})
-          </option>
-        ))}
-      </select>
-      {error && <span className="field-error">{error}</span>}
-    </label>
   );
 }
