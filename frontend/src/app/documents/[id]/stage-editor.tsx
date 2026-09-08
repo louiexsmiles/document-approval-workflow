@@ -1,7 +1,7 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Spinner } from '@/components/spinner';
 import {
   blankStage,
@@ -54,6 +54,18 @@ export function StageEditor({ document, users, lockedStageIds }: Props) {
   const [saving, setSaving] = useState(false);
   const busy = saving;
 
+  const [closeWhenRefreshed, setCloseWhenRefreshed] = useState(false);
+
+  // A new document prop means the refresh landed. Closing inside save() would discard that
+  // refresh, and listing closeWhenRefreshed below would close before it arrives.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    if (closeWhenRefreshed) {
+      setCloseWhenRefreshed(false);
+      setOpen(false);
+    }
+  }, [document]);
+
   function reset() {
     setStages(toDrafts(document, lockedStageIds));
     setError(null);
@@ -92,8 +104,8 @@ export function StageEditor({ document, users, lockedStageIds }: Props) {
 
     try {
       await updateStages(document.id, toStageInputs(stages));
-      setOpen(false);
-      requestAnimationFrame(() => router.refresh());
+      setCloseWhenRefreshed(true);
+      router.refresh();
     } catch (err) {
       if (err instanceof ApiError && err.status === 409) {
         setError(err.message);
