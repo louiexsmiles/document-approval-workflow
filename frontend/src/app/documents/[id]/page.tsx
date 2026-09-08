@@ -155,7 +155,10 @@ export default async function DocumentDetailPage({ params }: Props) {
                   : 'This document was rejected outright and cannot be resubmitted.'}
               </div>
             ) : (
-              <ApprovalActions documentId={document.id} />
+              <ApprovalActions
+                documentId={document.id}
+                currentStageId={current?.id ?? null}
+              />
             )}
           </section>
         </aside>

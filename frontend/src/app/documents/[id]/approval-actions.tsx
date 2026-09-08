@@ -11,19 +11,38 @@ import {
   type DocumentDetail,
 } from '@/lib/api';
 
-function successMessage(action: 'approve' | 'reject', result: DocumentDetail): string {
+function successMessage(
+  action: 'approve' | 'reject',
+  result: DocumentDetail,
+  stageBefore: string | null,
+): string {
+  const landedOn = result.stages.find((stage) => stage.id === result.currentStage?.id);
+
   if (action === 'reject') {
-    return result.status === 'REJECTED'
-      ? 'Rejected — this document is closed'
+    if (result.status === 'REJECTED') return 'Rejected — this document is closed';
+    return landedOn
+      ? `Rejected — sent back to ${landedOn.name}`
       : 'Rejected — sent back for changes';
   }
-  if (result.status === 'APPROVED') {
-    return 'Document approved';
+
+  if (result.status === 'APPROVED') return 'Document approved';
+
+  // The document is sitting where it was, so this stage is waiting on someone else.
+  // Reporting that it advanced would contradict the workflow panel beside it.
+  if (result.currentStage?.id === stageBefore) {
+    return 'Approved — this stage still needs another approver';
   }
-  return 'Approved — moved to the next stage';
+
+  return landedOn ? `Approved — moved to ${landedOn.name}` : 'Approved — moved on';
 }
 
-export function ApprovalActions({ documentId }: { documentId: string }) {
+type Props = {
+  documentId: string;
+  /** The stage the document sits at now, so a result can be compared against it. */
+  currentStageId: string | null;
+};
+
+export function ApprovalActions({ documentId, currentStageId }: Props) {
   const router = useRouter();
   const { activeUserId } = useActingAs();
   const [comment, setComment] = useState('');
@@ -60,7 +79,7 @@ export function ApprovalActions({ documentId }: { documentId: string }) {
           ? await approveDocument(documentId, activeUserId, reason || undefined)
           : await rejectDocument(documentId, activeUserId, reason);
 
-      setSuccess(successMessage(action, result));
+      setSuccess(successMessage(action, result, currentStageId));
       setComment('');
       router.refresh();
     } catch (err) {
