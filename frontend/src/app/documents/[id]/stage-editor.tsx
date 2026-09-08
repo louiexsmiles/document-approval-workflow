@@ -1,7 +1,7 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import { useState } from 'react';
+import { useState, useTransition } from 'react';
 import { Spinner } from '@/components/spinner';
 import {
   blankStage,
@@ -52,6 +52,10 @@ export function StageEditor({ document, users, lockedStageIds }: Props) {
   );
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [refreshing, startRefresh] = useTransition();
+
+  // The save is not done until the refreshed page has arrived, so treat both as busy.
+  const busy = saving || refreshing;
 
   function reset() {
     setStages(toDrafts(document, lockedStageIds));
@@ -91,8 +95,12 @@ export function StageEditor({ document, users, lockedStageIds }: Props) {
 
     try {
       await updateStages(document.id, toStageInputs(stages));
-      setOpen(false);
-      router.refresh();
+      // One transition, so both commit once the refresh lands. Closing on its own commits
+      // immediately, and the collapsing subtree takes the pending refresh with it.
+      startRefresh(() => {
+        router.refresh();
+        setOpen(false);
+      });
     } catch (err) {
       if (err instanceof ApiError && err.status === 409) {
         setError(err.message);
@@ -165,11 +173,11 @@ export function StageEditor({ document, users, lockedStageIds }: Props) {
         <button
           type="button"
           onClick={save}
-          disabled={saving}
+          disabled={busy}
           className="btn btn-primary min-w-[8rem]"
         >
-          {saving && <Spinner />}
-          {saving ? 'Saving…' : 'Save workflow'}
+          {busy && <Spinner />}
+          {busy ? 'Saving…' : 'Save workflow'}
         </button>
         <button
           type="button"
@@ -177,7 +185,7 @@ export function StageEditor({ document, users, lockedStageIds }: Props) {
             reset();
             setOpen(false);
           }}
-          disabled={saving}
+          disabled={busy}
           className="btn btn-secondary"
         >
           Cancel
