@@ -106,6 +106,11 @@ export async function createTestApp(options: TestAppOptions = {}): Promise<TestC
 
   await app.init();
 
+  // Bind a real port once. Without this the server is never listening, so supertest binds
+  // and unbinds it per request - and back-to-back calls occasionally race that teardown,
+  // surfacing as "socket hang up" on whichever test happens to be running.
+  await app.listen(0);
+
   const orm = app.get(MikroORM);
   const em = app.get(EntityManager);
 
