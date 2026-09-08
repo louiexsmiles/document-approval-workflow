@@ -1,7 +1,12 @@
 'use client';
 
-import type { StageApprovalPolicy, User } from '@/lib/api';
-import { POLICY_LABELS } from '@/lib/labels';
+import type {
+  StageApprovalPolicy,
+  StageInput,
+  StageRejectBehavior,
+  User,
+} from '@/lib/api';
+import { POLICY_LABELS, REJECT_BEHAVIOR_LABELS } from '@/lib/labels';
 
 export type StageDraft = {
   /** React key. Also the server-side id when this stage already exists. */
@@ -10,6 +15,13 @@ export type StageDraft = {
   name: string;
   approverIds: string[];
   policy: StageApprovalPolicy;
+  rejectBehavior: StageRejectBehavior;
+  /**
+   * Which stage a rejection returns to, held as that stage's draft key rather than its
+   * position. Positions shift when stages move or are removed; a key does not, so a
+   * reorder cannot quietly repoint a rejection at a different stage.
+   */
+  rejectTargetKey?: string | null;
   /** Set when the stage holds approvals in the current round and cannot be changed. */
   locked?: boolean;
 };
@@ -17,7 +29,13 @@ export type StageDraft = {
 let nextKey = 0;
 export function blankStage(name = ''): StageDraft {
   nextKey += 1;
-  return { key: `stage-${nextKey}`, name, approverIds: [], policy: 'ANY' };
+  return {
+    key: `stage-${nextKey}`,
+    name,
+    approverIds: [],
+    policy: 'ANY',
+    rejectBehavior: 'TO_FIRST_STAGE',
+  };
 }
 
 /** Mirrors the API's rules so the person is told before the round trip. */
@@ -25,12 +43,49 @@ export function firstStageProblem(stages: StageDraft[]): string | null {
   if (stages.length === 0) return 'A document needs at least one approval stage.';
 
   for (const [index, stage] of stages.entries()) {
+    const label = stage.name.trim() || `Stage ${index + 1}`;
+
     if (!stage.name.trim()) return `Stage ${index + 1} needs a name.`;
     if (stage.approverIds.length === 0) {
-      return `"${stage.name.trim() || `Stage ${index + 1}`}" has no approvers, so nobody could ever act on it.`;
+      return `"${label}" has no approvers, so nobody could ever act on it.`;
+    }
+
+    if (stage.rejectBehavior === 'TO_SPECIFIC_STAGE') {
+      const target = stages.findIndex((s) => s.key === stage.rejectTargetKey);
+
+      if (target === -1) {
+        return `"${label}" sends rejections to a chosen stage, but none is selected.`;
+      }
+      // The server refuses a target at or after the rejecting stage — a rejection that
+      // moved a document forward would not be a rejection. Reordering can create this.
+      if (target >= index) {
+        return `"${label}" cannot send a rejection forward to "${stages[target].name.trim()}".`;
+      }
     }
   }
   return null;
+}
+
+/**
+ * Drafts to the shape the API takes. Reject targets are sent as positions, so the key is
+ * resolved to an index here — the one place that conversion happens.
+ */
+export function toStageInputs(stages: StageDraft[]): StageInput[] {
+  return stages.map((stage) => {
+    const input: StageInput = {
+      ...(stage.id ? { id: stage.id } : {}),
+      name: stage.name.trim(),
+      approverIds: stage.approverIds,
+      policy: stage.policy,
+      rejectBehavior: stage.rejectBehavior,
+    };
+
+    if (stage.rejectBehavior === 'TO_SPECIFIC_STAGE') {
+      const target = stages.findIndex((s) => s.key === stage.rejectTargetKey);
+      if (target !== -1) input.rejectTargetPosition = target;
+    }
+    return input;
+  });
 }
 
 /** Swap a stage with its neighbour. Returns the list unchanged at either end. */
@@ -52,6 +107,8 @@ type Props = {
   index: number;
   total: number;
   users: User[];
+  /** Every stage ahead of this one — the only legal targets for a rejection. */
+  earlierStages: { key: string; name: string }[];
   onChange: (patch: Partial<StageDraft>) => void;
   onToggleApprover: (userId: string) => void;
   onMove: (direction: -1 | 1) => void;
@@ -67,6 +124,7 @@ export function StageFields({
   index,
   total,
   users,
+  earlierStages,
   onChange,
   onToggleApprover,
   onMove,
@@ -144,6 +202,53 @@ export function StageFields({
               >
                 <option value="ANY">{POLICY_LABELS.ANY}</option>
                 <option value="ALL">{POLICY_LABELS.ALL}</option>
+              </select>
+            </label>
+          )}
+
+          <label className="field">
+            <span className="field-label">If rejected here</span>
+            <select
+              value={stage.rejectBehavior}
+              onChange={(event) =>
+                onChange({ rejectBehavior: event.target.value as StageRejectBehavior })
+              }
+              disabled={locked}
+              className="input disabled:bg-stone-100 disabled:text-stone-500"
+              aria-label={`Reject behaviour for stage ${index + 1}`}
+            >
+              <option value="TO_FIRST_STAGE">{REJECT_BEHAVIOR_LABELS.TO_FIRST_STAGE}</option>
+              <option value="TO_PREVIOUS_STAGE">
+                {REJECT_BEHAVIOR_LABELS.TO_PREVIOUS_STAGE}
+              </option>
+              {/* Nothing precedes the first stage, so there is nothing to choose. */}
+              {earlierStages.length > 0 && (
+                <option value="TO_SPECIFIC_STAGE">
+                  {REJECT_BEHAVIOR_LABELS.TO_SPECIFIC_STAGE}
+                </option>
+              )}
+              <option value="TERMINAL">{REJECT_BEHAVIOR_LABELS.TERMINAL}</option>
+            </select>
+          </label>
+
+          {stage.rejectBehavior === 'TO_SPECIFIC_STAGE' && earlierStages.length > 0 && (
+            <label className="field">
+              <span className="field-label">Send it back to</span>
+              <select
+                value={stage.rejectTargetKey ?? ''}
+                onChange={(event) =>
+                  onChange({ rejectTargetKey: event.target.value || null })
+                }
+                disabled={locked}
+                className="input disabled:bg-stone-100 disabled:text-stone-500"
+                aria-label={`Reject target for stage ${index + 1}`}
+              >
+                <option value="">Choose a stage…</option>
+                {earlierStages.map((earlier, position) => (
+                  <option key={earlier.key} value={earlier.key}>
+                    {position + 1}. {earlier.name.trim() || 'Untitled stage'}
+                  </option>
+                ))}
               </select>
             </label>
           )}

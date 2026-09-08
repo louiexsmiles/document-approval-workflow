@@ -1,8 +1,24 @@
 import type { DocumentDetail, Stage } from '@/lib/api';
 import { currentStageOf, orderedStages } from '@/lib/api';
-import { POLICY_LABELS } from '@/lib/labels';
+import { POLICY_LABELS, REJECT_BEHAVIOR_LABELS } from '@/lib/labels';
 
 type StageState = 'current' | 'passed' | 'pending' | 'closed';
+
+/**
+ * Where a rejection at this stage sends the document, in words. Named targets are looked
+ * up so the reader sees "back to Budget Review" rather than an id, and the default is
+ * skipped: saying it on every stage would drown the ones that differ.
+ */
+function rejectSummary(stage: Stage, stages: Stage[]): string | null {
+  if (stage.rejectBehavior === 'TO_FIRST_STAGE') return null;
+
+  if (stage.rejectBehavior === 'TO_SPECIFIC_STAGE') {
+    const target = stages.find((s) => s.id === stage.rejectTargetStage);
+    return target ? `Rejecting sends it back to ${target.name}` : null;
+  }
+  if (stage.rejectBehavior === 'TO_PREVIOUS_STAGE') return 'Rejecting sends it back one stage';
+  return 'Rejecting refuses the document outright';
+}
 
 /**
  * Where a stage sits relative to the document's progress. Derived from positions rather
@@ -58,6 +74,12 @@ export function StageList({ document }: { document: DocumentDetail }) {
                 {stage.approvers.length > 1 && (
                   <div className="mt-1.5 text-xs text-stone-500">
                     {POLICY_LABELS[stage.policy]} must approve
+                  </div>
+                )}
+
+                {rejectSummary(stage, stages) && (
+                  <div className="mt-1 text-xs text-stone-500">
+                    {rejectSummary(stage, stages)}
                   </div>
                 )}
               </div>

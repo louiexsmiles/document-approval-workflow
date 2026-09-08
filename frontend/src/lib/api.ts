@@ -41,6 +41,8 @@ export type Stage = {
   name: string;
   policy: StageApprovalPolicy;
   rejectBehavior: StageRejectBehavior;
+  /** Id of the stage a rejection returns to. Only set for TO_SPECIFIC_STAGE. */
+  rejectTargetStage: string | null;
   approvers: StageApprover[];
 };
 

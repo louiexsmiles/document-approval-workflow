@@ -35,7 +35,15 @@ describe('seed data', () => {
     const document = await em.findOneOrFail(
       Document,
       { title },
-      { populate: ['stages', 'stages.approvers', 'stages.approvers.user', 'currentStage'] },
+      {
+        populate: [
+          'stages',
+          'stages.approvers',
+          'stages.approvers.user',
+          'stages.rejectTargetStage',
+          'currentStage',
+        ],
+      },
     );
     const stages = document.stages.getItems().sort((a, b) => a.position - b.position);
     return { document, stages };
@@ -68,6 +76,18 @@ describe('seed data', () => {
 
     expect(stages).toHaveLength(5);
     expect(stages[4].rejectBehavior).toBe('TERMINAL');
+  });
+
+  it('seeds a stage that rejects to a chosen stage rather than to the start', async () => {
+    const { stages } = await documentNamed('Q4 Vendor Contract — Southwest Builders');
+    const legal = stages[2];
+
+    // Without this the seed shows three of the four reject behaviours and a reviewer
+    // never meets the one that needed a per-stage setting to exist at all.
+    expect(legal.rejectBehavior).toBe('TO_SPECIFIC_STAGE');
+    expect(legal.rejectTargetStage).not.toBeNull();
+    expect(legal.rejectTargetStage!.name).toBe('Budget Review');
+    expect(legal.rejectTargetStage!.position).toBeLessThan(legal.position);
   });
 
   it('seeds one document already finished, with no current stage', async () => {

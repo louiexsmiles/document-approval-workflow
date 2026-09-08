@@ -8,6 +8,7 @@ import {
   firstStageProblem,
   moveStage,
   StageFields,
+  toStageInputs,
   type StageDraft,
 } from '@/components/stage-fields';
 import {
@@ -15,7 +16,6 @@ import {
   orderedStages,
   updateStages,
   type DocumentDetail,
-  type StageInput,
   type User,
 } from '@/lib/api';
 
@@ -37,6 +37,9 @@ function toDrafts(document: DocumentDetail, locked: string[]): StageDraft[] {
     name: stage.name,
     approverIds: stage.approvers.map((approver) => approver.user.id),
     policy: stage.policy,
+    rejectBehavior: stage.rejectBehavior,
+    // Existing stages use their id as the draft key, so the target id is already a key.
+    rejectTargetKey: stage.rejectTargetStage,
     locked: locked.includes(stage.id),
   }));
 }
@@ -86,15 +89,8 @@ export function StageEditor({ document, users, lockedStageIds }: Props) {
     setError(null);
     setSaving(true);
 
-    const payload: StageInput[] = stages.map((stage) => ({
-      ...(stage.id ? { id: stage.id } : {}),
-      name: stage.name.trim(),
-      approverIds: stage.approverIds,
-      policy: stage.policy,
-    }));
-
     try {
-      await updateStages(document.id, payload);
+      await updateStages(document.id, toStageInputs(stages));
       setOpen(false);
       router.refresh();
     } catch (err) {
@@ -146,6 +142,7 @@ export function StageEditor({ document, users, lockedStageIds }: Props) {
             index={index}
             total={stages.length}
             users={users}
+            earlierStages={stages.slice(0, index)}
             onChange={(patch) => patchStage(stage.key, patch)}
             onToggleApprover={(userId) => toggleApprover(stage.key, userId)}
             onMove={(direction) =>

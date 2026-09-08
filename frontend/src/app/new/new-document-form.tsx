@@ -8,9 +8,10 @@ import {
   firstStageProblem,
   moveStage,
   StageFields,
+  toStageInputs,
   type StageDraft,
 } from '@/components/stage-fields';
-import { createDocument, type StageInput, type User } from '@/lib/api';
+import { createDocument, type User } from '@/lib/api';
 
 export function NewDocumentForm({ users }: { users: User[] }) {
   const router = useRouter();
@@ -60,17 +61,12 @@ export function NewDocumentForm({ users }: { users: User[] }) {
     setError(null);
     setSubmitting(true);
 
-    const payload: StageInput[] = stages.map((stage) => ({
-      name: stage.name.trim(),
-      approverIds: stage.approverIds,
-      policy: stage.policy,
-    }));
 
     try {
       const document = await createDocument({
         title: title.trim(),
         body: body.trim(),
-        stages: payload,
+        stages: toStageInputs(stages),
       });
       router.push(`/documents/${document.id}`);
       router.refresh();
@@ -141,6 +137,7 @@ export function NewDocumentForm({ users }: { users: User[] }) {
               index={index}
               total={stages.length}
               users={users}
+              earlierStages={stages.slice(0, index)}
               onChange={(patch) => patchStage(stage.key, patch)}
               onToggleApprover={(userId) => toggleApprover(stage.key, userId)}
               onMove={(direction) =>

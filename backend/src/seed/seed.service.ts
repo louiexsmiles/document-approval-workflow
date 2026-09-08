@@ -18,6 +18,8 @@ type StageSeed = {
   approvers: User[];
   policy?: StageApprovalPolicy;
   rejectBehavior?: StageRejectBehavior;
+  /** Position this stage sends a rejection to. Only read for TO_SPECIFIC_STAGE. */
+  rejectTargetPosition?: number;
 };
 
 @Injectable()
@@ -88,7 +90,15 @@ export class SeedService implements OnModuleInit {
       [
         { name: 'Requester Check', approvers: [alice] },
         { name: 'Budget Review', approvers: [dan] },
-        { name: 'Legal Review', approvers: [bob, eve], policy: StageApprovalPolicy.ALL },
+        {
+          name: 'Legal Review',
+          approvers: [bob, eve],
+          policy: StageApprovalPolicy.ALL,
+          // Legal sends a contract back to Budget, not to the beginning. The numbers are
+          // what changed; making the requester start over would be busywork.
+          rejectBehavior: StageRejectBehavior.TO_SPECIFIC_STAGE,
+          rejectTargetPosition: 1,
+        },
         { name: 'Compliance', approvers: [cara] },
         {
           name: 'Executive Sign-off',
@@ -131,6 +141,13 @@ export class SeedService implements OnModuleInit {
         this.em.create(StageApprover, { stage, user });
       }
       return stage;
+    });
+
+    // Second pass: a stage cannot point at a sibling that does not exist yet.
+    stages.forEach((seed, position) => {
+      if (seed.rejectTargetPosition !== undefined) {
+        created[position].rejectTargetStage = created[seed.rejectTargetPosition];
+      }
     });
 
     document.currentStage = created[0];
