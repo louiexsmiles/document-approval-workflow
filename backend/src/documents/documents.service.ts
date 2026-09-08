@@ -231,6 +231,28 @@ export class DocumentsService {
         'Cannot remove the stage this document is currently waiting at',
       );
     }
+
+    // A stage that ends up behind the document can never be reached, so nobody would ever
+    // approve it. Comparing earlier positions catches both new stages and reordered ones.
+    if (document.currentStage) {
+      const wasBehind = (input: UpdateStageDto): boolean => {
+        const before = input.id ? existing.get(input.id) : undefined;
+        return before !== undefined && before.position < document.currentStage!.position;
+      };
+
+      const waitingAt = dto.stages.findIndex(
+        (input) => input.id === document.currentStage!.id,
+      );
+      const stranded = dto.stages.findIndex(
+        (input, position) => position < waitingAt && !wasBehind(input),
+      );
+
+      if (stranded !== -1) {
+        throw new ConflictException(
+          `"${dto.stages[stranded].name}" would sit behind the stage this document is waiting at, so nobody could ever approve it`,
+        );
+      }
+    }
   }
 
   /** True if anything a locked stage is meant to freeze would move. */

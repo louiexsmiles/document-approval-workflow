@@ -125,6 +125,106 @@ describe('editing stages', () => {
       expect(await names(doc.id)).toEqual(['One', 'Inserted', 'Two', 'Three']);
     });
 
+    it('adds a stage right where the document is waiting', async () => {
+      const doc = await createDocument(threeStages());
+      const [one, two, three] = doc.stages.sort((a, b) => a.position - b.position);
+
+      // The document waits at One, so a new stage after it is still ahead of the work.
+      await patch(doc.id, [
+        { id: one.id, name: 'One', approverIds: [alice] },
+        { name: 'Inserted', approverIds: [cara] },
+        { id: two.id, name: 'Two', approverIds: [bob] },
+        { id: three.id, name: 'Three', approverIds: [cara] },
+      ]).expect(200);
+
+      expect(await names(doc.id)).toEqual(['One', 'Inserted', 'Two', 'Three']);
+    });
+
+    it('refuses a new stage added behind the document', async () => {
+      const doc = await createDocument(threeStages());
+      const [one, two, three] = doc.stages.sort((a, b) => a.position - b.position);
+      await approve(doc.id, alice).expect(201);
+
+      // Now waiting at Two. A stage inserted at the front would never be reached. Here the
+      // locked-stage rule refuses it first, because inserting also shifts One, which holds
+      // an approval this round - two guards covering the same mistake from opposite sides.
+      await patch(doc.id, [
+        { name: 'Never Reached', approverIds: [cara] },
+        { id: one.id, name: 'One', approverIds: [alice] },
+        { id: two.id, name: 'Two', approverIds: [bob] },
+        { id: three.id, name: 'Three', approverIds: [cara] },
+      ]).expect(409);
+
+      expect(await names(doc.id)).toEqual(['One', 'Two', 'Three']);
+    });
+
+    it('refuses a new stage placed behind the document', async () => {
+      const doc = await createDocument(threeStages());
+      const [one, two, three] = doc.stages.sort((a, b) => a.position - b.position);
+
+      // Nothing is approved, but the document already points at One. Renaming One and
+      // adding a stage after it expresses the same intent without skipping anything.
+      const response = await patch(doc.id, [
+        { name: 'Sneaked In', approverIds: [cara] },
+        { id: one.id, name: 'One', approverIds: [alice] },
+        { id: two.id, name: 'Two', approverIds: [bob] },
+        { id: three.id, name: 'Three', approverIds: [cara] },
+      ]).expect(409);
+
+      expect(response.body.message).toContain('Sneaked In');
+      expect(await names(doc.id)).toEqual(['One', 'Two', 'Three']);
+    });
+
+    it('refuses to reorder an unreached stage behind the document', async () => {
+      const doc = await createDocument(threeStages());
+      const [one, two, three] = doc.stages.sort((a, b) => a.position - b.position);
+
+      await approve(doc.id, alice).expect(201);
+      await approve(doc.id, bob).expect(201);
+      await reject(doc.id, cara).expect(201);
+
+      // Round 1 now, so nothing holds a current-round approval and no stage is locked.
+      // Three has never been approved; moving it in front of the document would strand it.
+      const response = await patch(doc.id, [
+        { id: three.id, name: 'Three', approverIds: [cara] },
+        { id: one.id, name: 'One', approverIds: [alice] },
+        { id: two.id, name: 'Two', approverIds: [bob] },
+      ]).expect(409);
+
+      expect(response.body.message).toContain('Three');
+      expect(await names(doc.id)).toEqual(['One', 'Two', 'Three']);
+    });
+
+    it('still allows reordering stages the document has already passed', async () => {
+      const doc = await createDocument([
+        { name: 'One', approverIds: [alice] },
+        { name: 'Two', approverIds: [bob] },
+        { name: 'Three', approverIds: [cara] },
+        {
+          name: 'Four',
+          approverIds: [alice],
+          rejectBehavior: StageRejectBehavior.TO_PREVIOUS_STAGE,
+        },
+      ]);
+      const [one, two, three, four] = doc.stages.sort((a, b) => a.position - b.position);
+
+      await approve(doc.id, alice).expect(201);
+      await approve(doc.id, bob).expect(201);
+      await approve(doc.id, cara).expect(201);
+      await reject(doc.id, alice).expect(201);
+
+      // Back at Three in round 2. One and Two sit behind the document and were both
+      // reached on the way past, so swapping them strands nothing.
+      await patch(doc.id, [
+        { id: two.id, name: 'Two', approverIds: [bob] },
+        { id: one.id, name: 'One', approverIds: [alice] },
+        { id: three.id, name: 'Three', approverIds: [cara] },
+        { id: four.id, name: 'Four', approverIds: [alice] },
+      ]).expect(200);
+
+      expect(await names(doc.id)).toEqual(['Two', 'One', 'Three', 'Four']);
+    });
+
     it('removes a stage nobody has approved', async () => {
       const doc = await createDocument(threeStages());
       const [one, , three] = doc.stages.sort((a, b) => a.position - b.position);
